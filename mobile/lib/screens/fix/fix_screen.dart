@@ -65,10 +65,14 @@ class _FixScreenState extends State<FixScreen> {
   }
 
   Future<void> _becomeArtisan() async {
+    // Captured before the first `await` — using `context` after an async
+    // gap risks acting on a BuildContext whose widget has since been
+    // disposed (e.g. the user navigated away mid-request).
+    final authState = context.read<AuthState>();
     setState(() => _applying = true);
     try {
       await ApiClient.instance.post('/fix/artisans/apply', body: {'category': _category, 'bio': ''});
-      await context.read<AuthState>().bootstrap();
+      await authState.bootstrap();
       await _loadAll();
     } on ApiException catch (e) {
       setState(() => _error = e.message);

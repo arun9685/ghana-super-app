@@ -49,10 +49,14 @@ class _FleetScreenState extends State<FleetScreen> {
       _busy = true;
       _error = null;
     });
+    // Captured before the first `await` — see fix_screen.dart's
+    // _becomeArtisan for why (using `context` after an async gap risks
+    // acting on a disposed widget's BuildContext).
+    final authState = context.read<AuthState>();
     try {
-      final me = context.read<AuthState>().me;
+      final me = authState.me;
       await ApiClient.instance.post('/fleet', body: {'name': '${me?.name ?? 'My'} Fleet'});
-      await context.read<AuthState>().bootstrap();
+      await authState.bootstrap();
       await _load();
     } on ApiException catch (e) {
       setState(() => _error = e.message);
