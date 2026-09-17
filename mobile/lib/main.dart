@@ -7,6 +7,7 @@ import 'screens/driver/driver_apply_screen.dart';
 import 'screens/driver/driver_dashboard_screen.dart';
 import 'config/theme.dart';
 
+
 void main() {
   runApp(
     ChangeNotifierProvider(
@@ -14,6 +15,23 @@ void main() {
       child: const SankofaApp(),
     ),
   );
+}
+
+// Version-proof theme builder: different Flutter SDK versions have used
+// different types for `ThemeData.cardTheme` (`CardTheme` on older
+// releases, `CardThemeData` on newer ones — the property was renamed
+// mid-migration), so naming that type directly broke depending on
+// whichever Flutter version compiled this file. Starting from
+// `ThemeData().cardTheme` and calling `.copyWith` on it sidesteps that —
+// it's already the correct type for whatever SDK is in use.
+ThemeData _buildTheme() {
+  final base = ThemeData(
+    useMaterial3: true,
+    colorScheme: ColorScheme.fromSeed(seedColor: navy, primary: navy, secondary: gold),
+    fontFamily: 'Roboto',
+    scaffoldBackgroundColor: bg,
+  );
+  return base.copyWith(cardTheme: base.cardTheme.copyWith(elevation: 1, shadowColor: Colors.black12));
 }
 
 class SankofaApp extends StatelessWidget {
@@ -24,14 +42,7 @@ class SankofaApp extends StatelessWidget {
     return MaterialApp(
       title: 'Sankofa',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-            seedColor: navy, primary: navy, secondary: gold),
-        fontFamily: 'Roboto',
-        scaffoldBackgroundColor: bg,
-        cardTheme: const CardTheme(elevation: 1, shadowColor: Colors.black12),
-      ),
+      theme: _buildTheme(),
       home: const _RootRouter(),
     );
   }
@@ -65,8 +76,7 @@ class _RootRouterState extends State<_RootRouter> {
     final isDriver = auth.me!.roles.contains('DRIVER');
     if (isDriver) return const DriverDashboardScreen();
     if (_showDriverApply) {
-      return DriverApplyScreen(
-          onBack: () => setState(() => _showDriverApply = false));
+      return DriverApplyScreen(onBack: () => setState(() => _showDriverApply = false));
     }
 
     return Scaffold(
