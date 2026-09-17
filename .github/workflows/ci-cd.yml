@@ -324,16 +324,23 @@ jobs:
       - name: Wait for ECR image scan to complete
         if: ${{ vars.ECR_REPOSITORY_URL != '' }}
         run: |
-          # AWS needs a few seconds after the push finishes before it even
-          # registers that a scan has started — calling the waiter
-          # immediately can hit "ScanNotFoundException" (the scan doesn't
-          # exist *yet*, not that it failed), and that error isn't one the
-          # waiter retries past on its own. This sleep just avoids racing
-          # ECR's own bookkeeping.
-          sleep 15
-          aws ecr wait image-scan-complete \
-            --repository-name ghana-super-app-backend \
-            --image-id imageTag=${{ github.sha }}
+          for i in $(seq 1 30); do
+            STATUS=$(aws ecr describe-image-scan-findings \
+              --repository-name ghana-super-app-backend \
+              --image-id imageTag=${{ github.sha }} \
+              --query 'imageScanStatus.status' --output text 2>/dev/null || echo "PENDING")
+            echo "Attempt $i: scan status = $STATUS"
+            if [ "$STATUS" = "COMPLETE" ]; then
+              exit 0
+            fi
+            if [ "$STATUS" = "FAILED" ]; then
+              echo "::error::ECR image scan failed outright (not just pending)."
+              exit 1
+            fi
+            sleep 10
+          done
+          echo "::error::ECR image scan did not complete within 5 minutes."
+          exit 1
 
       - name: Fail build on CRITICAL/HIGH vulnerabilities
         if: ${{ vars.ECR_REPOSITORY_URL != '' }}

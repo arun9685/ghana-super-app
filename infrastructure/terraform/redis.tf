@@ -17,7 +17,7 @@ resource "aws_elasticache_subnet_group" "main" {
 
 resource "aws_elasticache_replication_group" "main" {
   replication_group_id = "ghsa-${var.environment}"
-  description           = "Sankofa ${var.environment} Redis — OTP cooldowns, driver geo, matching"
+  description = "Sankofa ${var.environment} Redis - OTP cooldowns, driver geo, matching"
 
   engine               = "redis"
   engine_version       = "7.1"

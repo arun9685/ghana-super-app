@@ -23,9 +23,35 @@ resource "aws_iam_openid_connect_provider" "github" {
   thumbprint_list = [data.tls_certificate.github_actions.certificates[0].sha1_fingerprint]
 }
 
+locals {
+  # GitHub Actions OIDC tokens now embed hidden, immutable numeric IDs
+  # after the org/user name and the repo name — e.g. the "sub" claim
+  # looks like "repo:someorg@70888620/somerepo@1374296058:environment:x"
+  # instead of the old plain "repo:someorg/somerepo:environment:x". This
+  # is a GitHub-side change (protects against claim reuse if a repo is
+  # renamed/transferred) and applies account-wide, not something this
+  # project's history did. Confirmed via AWS CloudTrail's Event history:
+  # the denied AssumeRoleWithWebIdentity call's userName showed exactly
+  # this "name@id" shape. The StringLike condition below has to match
+  # THAT shape — a plain "repo:org/repo:*" pattern never matches it,
+  # which is what caused every deploy to fail with the misleading
+  # "Not authorized to perform sts:AssumeRoleWithWebIdentity" error even
+  # after sts:TagSession (also genuinely required, see below) was added.
+  gh_owner = split("/", var.github_repository)[0]
+  gh_repo  = split("/", var.github_repository)[1]
+}
+
 data "aws_iam_policy_document" "github_actions_assume_role" {
   statement {
-    actions = ["sts:AssumeRoleWithWebIdentity"]
+    # sts:TagSession is required alongside AssumeRoleWithWebIdentity
+    # because aws-actions/configure-aws-credentials@v4 attaches role
+    # session tags (repo/branch/actor info) by default. Without this,
+    # AWS denies the whole request with the misleading top-level message
+    # "Not authorized to perform sts:AssumeRoleWithWebIdentity" — the
+    # real cause is the missing TagSession grant, not the assume-role
+    # action itself (confirmed via the action's debug log showing
+    # "7 role session tags are being used" right before the denial).
+    actions = ["sts:AssumeRoleWithWebIdentity", "sts:TagSession"]
     principals {
       type        = "Federated"
       identifiers = [aws_iam_openid_connect_provider.github.arn]
@@ -35,13 +61,17 @@ data "aws_iam_policy_document" "github_actions_assume_role" {
       variable = "token.actions.githubusercontent.com:aud"
       values   = ["sts.amazonaws.com"]
     }
-    # Restricts which repo (and, within it, which ref) can assume this
-    # role — without this condition, ANY GitHub Actions workflow anywhere
-    # that knows this role's ARN could assume it.
+    # Restricts which repo (and, within it, which ref/environment) can
+    # assume this role — without this condition, ANY GitHub Actions
+    # workflow anywhere that knows this role's ARN could assume it.
+    # The "@*" after both the owner and repo names matches GitHub's
+    # current token format, which inserts a hidden numeric ID there
+    # (see the local.gh_owner/gh_repo comment above) — a plain
+    # "repo:owner/repo:*" pattern silently never matches real tokens.
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repository}:*"]
+      values   = ["repo:${local.gh_owner}@*/${local.gh_repo}@*:*"]
     }
   }
 }
@@ -65,6 +95,16 @@ data "aws_iam_policy_document" "github_actions_deploy" {
     sid       = "ECRAuth"
     actions   = ["ecr:GetAuthorizationToken"]
     resources = ["*"] # this specific action is not resource-scopable in IAM
+  }
+  statement {
+    # Needed by the pipeline's "Wait for ECR image scan to complete" /
+    # "Fail build on CRITICAL/HIGH vulnerabilities" steps (ci-cd.yml),
+    # which poll the scan AWS already runs automatically on every push
+    # (ecr.tf's scan_on_push) — pushing the image alone doesn't grant
+    # permission to read the scan results back.
+    sid       = "ReadECRScanResults"
+    actions   = ["ecr:DescribeImages", "ecr:DescribeImageScanFindings"]
+    resources = [aws_ecr_repository.backend.arn]
   }
   statement {
     sid       = "RegisterTaskDefinitions"

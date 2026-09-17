@@ -12,6 +12,7 @@ resource "aws_ecs_cluster" "main" {
 }
 
 resource "aws_cloudwatch_log_group" "backend" {
+  depends_on = [aws_lb_listener.http]
   name              = "/ecs/ghsa-${var.environment}-backend"
   retention_in_days = var.environment == "production" ? 90 : 14
 }

@@ -23,7 +23,7 @@ resource "aws_db_parameter_group" "postgres_force_ssl" {
 resource "aws_db_instance" "main" {
   identifier     = "ghsa-${var.environment}"
   engine         = "postgres"
-  engine_version = "16.4"
+  engine_version = "16"
   instance_class = var.db_instance_class
 
   allocated_storage     = 20
