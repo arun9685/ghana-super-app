@@ -324,7 +324,7 @@ jobs:
       - name: Wait for ECR image scan to complete
         if: ${{ vars.ECR_REPOSITORY_URL != '' }}
         run: |
-          for i in $(seq 1 30); do
+          for i in $(seq 1 60); do
             STATUS=$(aws ecr describe-image-scan-findings \
               --repository-name ghana-super-app-backend \
               --image-id imageTag=${{ github.sha }} \
