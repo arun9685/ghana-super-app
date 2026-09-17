@@ -148,14 +148,17 @@ if (env.NODE_ENV !== "test") {
 
   // Don't drop in-flight requests on deploy — finish them, then exit.
   // Matters more once this runs behind an ALB doing rolling deploys (spec §47).
-  function shutdown(signal: string) {
+  // A function EXPRESSION (not a `function shutdown(...)` declaration) —
+  // ESLint's `no-inner-declarations` (part of eslint:recommended) disallows
+  // function declarations inside a block like this `if`.
+  const shutdown = (signal: string) => {
     logger.info(`${signal} received — shutting down gracefully`);
     server!.close(async () => {
       await prisma.$disconnect();
       redis.disconnect();
       process.exit(0);
     });
-  }
+  };
   process.on("SIGTERM", () => shutdown("SIGTERM"));
   process.on("SIGINT", () => shutdown("SIGINT"));
 }
