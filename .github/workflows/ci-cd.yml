@@ -211,7 +211,14 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.24.0"
+          # No pinned version — pinning to an old release (3.24.0) hit a
+          # real Gradle/Groovy incompatibility on GitHub's current runner
+          # image ("import groovy.xml.QName" failing at Gradle startup,
+          # inside flutter.gradle itself — a version mismatch between that
+          # old Flutter release's bundled Gradle plugin and the newer
+          # Groovy on the runner, not a bug in this app's code). Always
+          # using the current stable release keeps that toolchain matched
+          # to whatever GitHub's runners actually have.
           channel: stable
           cache: true
 
