@@ -30,7 +30,7 @@ class SankofaApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: navy, primary: navy, secondary: gold),
         fontFamily: 'Roboto',
         scaffoldBackgroundColor: bg,
-        cardTheme: CardThemeData(elevation: 1, shadowColor: Colors.black12),
+        cardTheme: const CardTheme(elevation: 1, shadowColor: Colors.black12),
       ),
       home: const _RootRouter(),
     );
