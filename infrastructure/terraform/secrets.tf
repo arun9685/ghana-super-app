@@ -115,12 +115,24 @@ resource "aws_secretsmanager_secret_version" "pii_hash_key" {
   secret_string = random_password.pii_hash_key.result
 }
 
-# Empty placeholder — fill in via `aws secretsmanager put-secret-value`
-# once you have a real SMS provider account. Terraform won't fight you for
-# changing a value out-of-band here since there's no _version resource
-# pinning it to a generated default.
+# Placeholder — fill in via `aws secretsmanager put-secret-value` once
+# you have a real SMS provider account. It still needs SOME value now,
+# not none: ECS's task definition (ecs.tf) references this ARN in its
+# `secrets` list, and the execution role's GetSecretValue call fails
+# outright (ResourceInitializationError, task never starts) if the
+# secret has no version at all — an empty string is fine here since
+# SMS_PROVIDER=console means this value is never actually read yet.
+# `lifecycle.ignore_changes` means a real key set later via the AWS CLI
+# won't get silently overwritten back to "" by a future `terraform apply`.
 resource "aws_secretsmanager_secret" "sms_provider_api_key" {
   name = "ghsa-${var.environment}-sms-provider-api-key"
+}
+resource "aws_secretsmanager_secret_version" "sms_provider_api_key" {
+  secret_id     = aws_secretsmanager_secret.sms_provider_api_key.id
+  secret_string = "not-configured"
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
 }
 
 # Lets the ECS execution role fetch these specific secrets at task start —

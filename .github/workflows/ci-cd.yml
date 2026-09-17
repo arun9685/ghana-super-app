@@ -431,7 +431,7 @@ jobs:
   # ---------------------------------------------------------------------
   frontend-deploy:
     needs: [backend-test, frontend-build]
-    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') && vars.FRONTEND_S3_BUCKET != ''
+        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -459,16 +459,19 @@ jobs:
           VITE_SOCKET_URL: ${{ vars.VITE_SOCKET_URL }}
 
       - name: Configure AWS credentials (OIDC)
+        if: ${{ vars.FRONTEND_S3_BUCKET != '' }}
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
       - name: Sync build output to S3
+        if: ${{ vars.FRONTEND_S3_BUCKET != '' }}
         run: |
           aws s3 sync dist/ "s3://${{ vars.FRONTEND_S3_BUCKET }}" --delete
 
       - name: Invalidate CloudFront cache
+        if: ${{ vars.FRONTEND_S3_BUCKET != '' }}
         run: |
           aws cloudfront create-invalidation \
             --distribution-id "${{ vars.FRONTEND_CLOUDFRONT_DIST_ID }}" \
