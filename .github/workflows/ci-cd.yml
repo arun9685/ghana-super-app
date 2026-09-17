@@ -326,7 +326,7 @@ jobs:
         if: ${{ vars.ECR_REPOSITORY_URL != '' }}
         continue-on-error: true
         run: |
-          for i in $(seq 1 60); do
+          for i in $(seq 1 30); do
             STATUS=$(aws ecr describe-image-scan-findings \
               --repository-name ghana-super-app-backend \
               --image-id imageTag=${{ github.sha }} \
