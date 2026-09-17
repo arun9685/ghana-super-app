@@ -47,9 +47,12 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
   Future<void> _loadActiveRide() async {
     try {
       final data = await ApiClient.instance.get('/rides/active-for-driver');
-      if (mounted)
+      if (mounted) {
         setState(() => _activeRide = data != null ? Ride.fromJson(data) : null);
-      if (_activeRide != null) SocketService.instance.joinRide(_activeRide!.id);
+      }
+      if (_activeRide != null) {
+        SocketService.instance.joinRide(_activeRide!.id);
+      }
     } catch (_) {}
   }
 

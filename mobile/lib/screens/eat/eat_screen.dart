@@ -45,8 +45,9 @@ class _EatScreenState extends State<EatScreen> {
       final currentRestaurant = _cart.values.isNotEmpty
           ? _cart.values.first['restaurantId'] as String
           : null;
-      if (currentRestaurant != null && currentRestaurant != restaurantId)
+      if (currentRestaurant != null && currentRestaurant != restaurantId) {
         _cart.clear();
+      }
       final existing = _cart[item['id']];
       _cart[item['id']] = {
         'restaurantId': restaurantId,
@@ -210,11 +211,12 @@ class _EatOrdersScreenState extends State<EatOrdersScreen> {
   void initState() {
     super.initState();
     ApiClient.instance.get('/eat/orders').then((data) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _orders = data as List;
           _loading = false;
         });
+      }
     }).catchError((_) {
       if (mounted) setState(() => _loading = false);
     });

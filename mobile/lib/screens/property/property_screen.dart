@@ -41,11 +41,15 @@ class _PropertyScreenState extends State<PropertyScreen> {
   Future<void> _load() async {
     try {
       final listings = await ApiClient.instance.get('/property/listings');
-      if (mounted) setState(() => _listings = listings as List);
+      if (mounted) {
+        setState(() => _listings = listings as List);
+      }
     } catch (_) {}
     try {
       final mine = await ApiClient.instance.get('/property/listings/mine');
-      if (mounted) setState(() => _myListings = mine as List);
+      if (mounted) {
+        setState(() => _myListings = mine as List);
+      }
     } catch (_) {}
   }
 
@@ -69,9 +73,10 @@ class _PropertyScreenState extends State<PropertyScreen> {
     try {
       await ApiClient.instance.post('/property/listings/$listingId/enquiries',
           body: {'message': message});
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(const SnackBar(content: Text('Enquiry sent!')));
+      }
     } on ApiException catch (e) {
       setState(() => _error = e.message);
     }
@@ -102,7 +107,9 @@ class _PropertyScreenState extends State<PropertyScreen> {
     } on ApiException catch (e) {
       setState(() => _error = e.message);
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() => _busy = false);
+      }
     }
   }
 
