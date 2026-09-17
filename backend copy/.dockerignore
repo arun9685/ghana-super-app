@@ -1,0 +1,23 @@
+# Keeps the Docker build context small and prevents host-installed
+# artifacts (built on whatever OS the developer is on) from being copied
+# into the image and overwriting what the container installs for itself.
+#
+# Without this file, `COPY . .` in the Dockerfile copies the host's local
+# node_modules straight into the container, clobbering the Linux-native
+# one that `npm ci` just installed a step earlier — which is what causes
+# broken or missing build output (e.g. a missing dist/main.js).
+
+node_modules
+dist
+coverage
+
+# Secrets should never be baked into an image — they're injected at
+# container start time via docker-compose's env_file/environment instead.
+.env
+.env.*
+
+.git
+.gitignore
+.vscode
+*.log
+npm-debug.log*

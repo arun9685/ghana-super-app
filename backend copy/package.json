@@ -1,0 +1,61 @@
+{
+  "name": "@ghana-super-app/backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ghana Super App backend — modular monolith (spec Section 8)",
+  "main": "dist/main.js",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc -p tsconfig.json && tsc-alias -p tsconfig.json",
+    "start": "node dist/main.js",
+    "lint": "eslint \"src/**/*.ts\"",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "prisma:generate": "dotenv -e .env -- prisma generate",
+    "prisma:migrate": "dotenv -e .env -- prisma migrate dev",
+    "prisma:deploy": "dotenv -e .env -- prisma migrate deploy",
+    "prisma:studio": "dotenv -e .env -- prisma studio",
+    "prisma:seed": "dotenv -e .env -- tsx prisma/seed.ts",
+    "simulate:webhook": "dotenv -e .env -- tsx scripts/simulate-gateway-webhook.ts",
+    "rotate:pii-keys": "dotenv -e .env -- tsx scripts/rotate-pii-keys.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.19.1",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.4.0",
+    "helmet": "^7.1.0",
+    "ioredis": "^5.4.1",
+    "jsonwebtoken": "^9.0.2",
+    "pino": "^9.4.0",
+    "pino-http": "^10.3.0",
+    "socket.io": "^4.8.0",
+    "uuid": "^10.0.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/node": "^22.5.5",
+    "@types/uuid": "^10.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.6.0",
+    "@typescript-eslint/parser": "^8.6.0",
+    "dotenv-cli": "^7.4.2",
+    "eslint": "^8.57.0",
+    "prisma": "^5.19.1",
+    "supertest": "^7.0.0",
+    "tsc-alias": "^1.8.10",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.2",
+    "vitest": "^2.1.1",
+    "@vitest/coverage-v8": "^2.1.1"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

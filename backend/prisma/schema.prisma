@@ -1,0 +1,790 @@
+// Full core-loop schema (spec Section 34 table set). Sprint 1's original
+// User/UserRole/CustomerProfile/DriverProfile/OtpCode/RefreshToken models
+// are kept exactly as they were (migrations stay additive) and everything
+// below extends them: vehicles, rides, matching's read model (Redis, not
+// here), pricing, payments, ratings, notifications, support, admin.
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  DRIVER
+  FLEET_OWNER
+  RESTAURANT
+  DELIVERY_PARTNER
+  ARTISAN
+  CORPORATE_ADMIN
+  CORPORATE_USER
+  PLATFORM_ADMIN
+}
+
+enum VehicleType {
+  MOTORBIKE
+  TUKTUK
+  SEDAN
+  SUV
+}
+
+enum RideStatus {
+  REQUESTED
+  SEARCHING
+  ASSIGNED
+  ARRIVED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_DRIVERS_FOUND
+}
+
+enum PaymentMethod {
+  CASH
+  MOMO
+  CARD
+  WALLET
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum NotificationChannel {
+  INAPP
+  PUSH
+  SMS
+  EMAIL
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+// spec §10: a user can eventually hold multiple roles.
+model User {
+  id String @id @default(uuid())
+
+  // phone/name/email hold AES-256-GCM ciphertext at rest, not plaintext —
+  // see src/common/crypto/piiEncryption.ts and the Prisma client extension
+  // in src/database/prisma.ts, which transparently encrypts on every
+  // write and decrypts on every read (including through relations), so
+  // application code everywhere else just reads/writes these as plain
+  // strings. Because AES-GCM output differs per-call (random IV), `phone`
+  // itself can no longer be the unique lookup key — that's what
+  // `phoneHash` is: a deterministic HMAC-SHA256 "blind index" computed
+  // from the plaintext phone number, used for every uniqueness check and
+  // WHERE-by-phone lookup instead.
+  phone           String
+  phoneHash       String   @unique
+  email           String?
+  name            String?
+  isPhoneVerified Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  roles              UserRole[]
+  customerProfile    CustomerProfile?
+  driverProfile       DriverProfile?
+  otpCodes            OtpCode[]
+  refreshTokens       RefreshToken[]
+  ridesAsCustomer     Ride[]             @relation("CustomerRides")
+  ratingsGiven        Rating[]           @relation("RatingsGiven")
+  notifications       Notification[]
+  supportTickets      SupportTicket[]
+  supportMessagesSent SupportMessage[]
+
+  // Service-tile domains (spec's broader "super-app" scope beyond MVP1
+  // Mobility). Real structure — schema, module, endpoints — with the
+  // actual third-party integrations (restaurant POS, telco top-up,
+  // credit scoring, flight/bus inventory) abstracted behind a provider
+  // interface per domain, same pattern as SmsProvider/PaymentProvider,
+  // ready to wire up without changing anything else.
+  restaurantsOwned    Restaurant[]
+  foodOrders          FoodOrder[]
+  artisanProfile      ArtisanProfile?
+  serviceRequests     ServiceRequest[]
+  utilityPayments     UtilityPayment[]
+  wallet              Wallet?
+  loanApplications    LoanApplication[]
+  fleet               Fleet?
+  propertyListings    PropertyListing[]
+  propertyEnquiries   PropertyEnquiry[]
+  travelBookings      TravelBooking[]
+
+  @@map("users")
+}
+
+model UserRole {
+  id     String @id @default(uuid())
+  userId String
+  role   Role
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, role])
+  @@map("user_roles")
+}
+
+model CustomerProfile {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  homeArea  String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("customer_profiles")
+}
+
+// spec §28: documents, verification status, vehicle relation, rating.
+model DriverProfile {
+  id                 String    @id @default(uuid())
+  userId             String    @unique
+  licenseNumber      String?
+  verificationStatus String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  rejectionReason    String?
+  isOnline           Boolean   @default(false)
+  ratingAvg          Float     @default(5.0)
+  ratingCount        Int       @default(0)
+  completedRideCount Int       @default(0)
+  // Last-known location as a cheap Postgres fallback for admin views only.
+  // The authoritative, high-frequency live position lives in Redis GEO
+  // (spec §18: "do not write every GPS update directly to PostgreSQL") —
+  // see locations.service.ts. This column is throttled to update at most
+  // once every ~10s from the same ping.
+  lastLat            Float?
+  lastLng            Float?
+  lastLocationAt     DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicle         Vehicle?
+  ridesAsDriver   Ride[]        @relation("DriverRides")
+  ratingsReceived Rating[]      @relation("RatingsReceived")
+  fleetVehicle    FleetVehicle?
+
+  @@map("driver_profiles")
+}
+
+model Vehicle {
+  id              String      @id @default(uuid())
+  driverProfileId String      @unique
+  type            VehicleType
+  make            String
+  model           String
+  color           String
+  plateNumber     String      @unique
+  year            Int?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  driverProfile DriverProfile @relation(fields: [driverProfileId], references: [id], onDelete: Cascade)
+  rides         Ride[]
+
+  @@map("vehicles")
+}
+
+// OTP is stored hashed, never in plaintext, with an expiry and attempt
+// counter — spec §11/§44 (OTP abuse detection).
+model OtpCode {
+  id         String    @id @default(uuid())
+  userId     String
+  codeHash   String
+  expiresAt  DateTime
+  attempts   Int       @default(0)
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@map("otp_codes")
+}
+
+// Refresh tokens are stored hashed and rotated on every use (spec §41:
+// refresh-token rotation), so a leaked token is only valid once.
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// spec §21-22: one row per vehicle type. Kept as a simple flat rate card
+// rather than a full zone/time-of-day rule engine — that's the documented
+// Phase 2+ extension point (spec §22 "pricing_zones"), not needed to run
+// a real fare calculation end to end.
+model PricingRule {
+  id              String      @id @default(uuid())
+  vehicleType     VehicleType @unique
+  baseFareCents   Int
+  perKmCents      Int
+  perMinCents     Int
+  minFareCents    Int
+  bookingFeeCents Int         @default(200)
+  surgeMultiplier Float       @default(1.0)
+  currency        String      @default("GHS")
+  updatedAt       DateTime    @updatedAt
+
+  @@map("pricing_rules")
+}
+
+// spec §15-16: ride creation, fare estimate, ride state machine.
+model Ride {
+  id                   String      @id @default(uuid())
+  customerId           String
+  driverProfileId      String?
+  vehicleId            String?
+  status               RideStatus  @default(REQUESTED)
+  requestedVehicleType VehicleType @default(SEDAN)
+
+  pickupLat       Float
+  pickupLng       Float
+  pickupAddress   String
+  dropoffLat      Float
+  dropoffLng      Float
+  dropoffAddress  String
+  distanceKm      Float?
+  durationMin     Int?
+
+  estimatedFareCents Int
+  finalFareCents     Int?
+  currency           String        @default("GHS")
+  paymentMethod      PaymentMethod @default(CASH)
+
+  cancelledBy        String?
+  cancellationReason String?
+
+  requestedAt DateTime  @default(now())
+  assignedAt  DateTime?
+  arrivedAt   DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
+  cancelledAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  customer      User             @relation("CustomerRides", fields: [customerId], references: [id])
+  driverProfile DriverProfile?   @relation("DriverRides", fields: [driverProfileId], references: [id])
+  vehicle       Vehicle?         @relation(fields: [vehicleId], references: [id])
+  statusEvents  RideStatusEvent[]
+  payment       Payment?
+  rating        Rating?
+  supportTickets SupportTicket[]
+
+  @@index([customerId])
+  @@index([driverProfileId])
+  @@index([status])
+  @@map("rides")
+}
+
+// Full audit trail of every state transition (spec §16) — used by the
+// admin dashboard and by support to reconstruct what happened on a ride.
+model RideStatusEvent {
+  id        String     @id @default(uuid())
+  rideId    String
+  status    RideStatus
+  note      String?
+  createdAt DateTime   @default(now())
+  ride      Ride       @relation(fields: [rideId], references: [id], onDelete: Cascade)
+
+  @@index([rideId])
+  @@map("ride_status_events")
+}
+
+// spec §23-25: payment abstraction, MoMo/card/wallet providers, ledger.
+model Payment {
+  id          String        @id @default(uuid())
+  rideId      String        @unique
+  amountCents Int
+  currency    String        @default("GHS")
+  method      PaymentMethod
+  status      PaymentStatus @default(PENDING)
+  providerRef String?
+  failureReason String?
+  paidAt      DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  ride Ride @relation(fields: [rideId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+// spec §30: post-trip ratings, server-side average calculation.
+model Rating {
+  id                    String   @id @default(uuid())
+  rideId                String   @unique
+  ratedByUserId         String
+  ratedDriverProfileId  String?
+  stars                 Int
+  comment               String?
+  createdAt             DateTime @default(now())
+
+  ride           Ride           @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  ratedBy        User           @relation("RatingsGiven", fields: [ratedByUserId], references: [id])
+  ratedDriver    DriverProfile? @relation("RatingsReceived", fields: [ratedDriverProfileId], references: [id])
+
+  @@map("ratings")
+}
+
+// spec §31: push/SMS/email dispatch abstraction. This table is the
+// in-app inbox; the channel field records where it was (or will be) sent,
+// notification.service.ts's dispatch layer is what actually sends it.
+model Notification {
+  id        String               @id @default(uuid())
+  userId    String
+  channel   NotificationChannel  @default(INAPP)
+  type      String
+  title     String
+  body      String
+  data      Json?
+  readAt    DateTime?
+  createdAt DateTime             @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+// spec §32 admin module dependency: support tickets.
+model SupportTicket {
+  id          String       @id @default(uuid())
+  userId      String
+  rideId      String?
+  subject     String
+  description String
+  status      TicketStatus @default(OPEN)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  user     User             @relation(fields: [userId], references: [id])
+  ride     Ride?            @relation(fields: [rideId], references: [id])
+  messages SupportMessage[]
+
+  @@index([userId])
+  @@index([status])
+  @@map("support_tickets")
+}
+
+model SupportMessage {
+  id        String   @id @default(uuid())
+  ticketId  String
+  senderId  String
+  body      String
+  createdAt DateTime @default(now())
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  sender User          @relation(fields: [senderId], references: [id])
+
+  @@index([ticketId])
+  @@map("support_messages")
+}
+
+// ============================================================================
+// Service-tile domains — real structure (schema + module + endpoints) for
+// each of the dashboard's other tiles, per an explicit decision to build the
+// architecture now and plug in real third-party integrations later rather
+// than fake full functionality or leave the tiles inert. Each domain's
+// "provider" interface (its equivalent of SmsProvider/PaymentProvider) lives
+// in its own backend module and is the one place a real integration gets
+// wired in — see each module's README section in the top-level README.md.
+// ============================================================================
+
+// ---- Eat: food ordering & delivery -----------------------------------------
+
+enum FoodOrderStatus {
+  PLACED
+  CONFIRMED
+  PREPARING
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
+
+model Restaurant {
+  id          String   @id @default(uuid())
+  ownerId     String?
+  name        String
+  description String?
+  area        String
+  imageUrl    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  owner     User?       @relation(fields: [ownerId], references: [id])
+  menuItems MenuItem[]
+  orders    FoodOrder[]
+
+  @@map("restaurants")
+}
+
+model MenuItem {
+  id          String  @id @default(uuid())
+  restaurantId String
+  name        String
+  description String?
+  priceCents  Int
+  isAvailable Boolean @default(true)
+
+  restaurant Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  orderItems FoodOrderItem[]
+
+  @@index([restaurantId])
+  @@map("menu_items")
+}
+
+model FoodOrder {
+  id                 String          @id @default(uuid())
+  customerId         String
+  restaurantId       String
+  status             FoodOrderStatus @default(PLACED)
+  deliveryAddress    String
+  deliveryLat        Float
+  deliveryLng        Float
+  itemsSubtotalCents Int
+  deliveryFeeCents   Int             @default(500)
+  totalCents         Int
+  paymentMethod      PaymentMethod   @default(CASH)
+  paymentStatus      PaymentStatus   @default(PENDING)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  customer   User            @relation(fields: [customerId], references: [id])
+  restaurant Restaurant      @relation(fields: [restaurantId], references: [id])
+  items      FoodOrderItem[]
+
+  @@index([customerId])
+  @@index([restaurantId])
+  @@map("food_orders")
+}
+
+model FoodOrderItem {
+  id             String @id @default(uuid())
+  orderId        String
+  menuItemId     String
+  quantity       Int
+  unitPriceCents Int
+
+  order    FoodOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItem MenuItem  @relation(fields: [menuItemId], references: [id])
+
+  @@index([orderId])
+  @@map("food_order_items")
+}
+
+// ---- Fix: home services & artisans -----------------------------------------
+
+enum ArtisanCategory {
+  PLUMBING
+  ELECTRICAL
+  CLEANING
+  CARPENTRY
+  PAINTING
+  APPLIANCE_REPAIR
+  OTHER
+}
+
+enum ServiceRequestStatus {
+  REQUESTED
+  ACCEPTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model ArtisanProfile {
+  id                 String   @id @default(uuid())
+  userId             String   @unique
+  category           ArtisanCategory
+  bio                String?
+  verificationStatus String   @default("PENDING")
+  ratingAvg          Float    @default(5.0)
+  ratingCount        Int      @default(0)
+  completedJobCount  Int      @default(0)
+  createdAt          DateTime @default(now())
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  serviceRequests ServiceRequest[]
+
+  @@map("artisan_profiles")
+}
+
+model ServiceRequest {
+  id                String                @id @default(uuid())
+  customerId        String
+  artisanProfileId  String?
+  category          ArtisanCategory
+  description       String
+  address           String
+  lat               Float
+  lng               Float
+  status            ServiceRequestStatus  @default(REQUESTED)
+  quotedPriceCents  Int?
+  finalPriceCents   Int?
+  paymentMethod     PaymentMethod         @default(CASH)
+  paymentStatus     PaymentStatus         @default(PENDING)
+  requestedAt       DateTime              @default(now())
+  completedAt       DateTime?
+
+  customer       User            @relation(fields: [customerId], references: [id])
+  artisanProfile ArtisanProfile? @relation(fields: [artisanProfileId], references: [id])
+
+  @@index([customerId])
+  @@index([artisanProfileId])
+  @@map("service_requests")
+}
+
+// ---- Utilities: airtime, data, bill top-ups --------------------------------
+
+enum UtilityType {
+  AIRTIME
+  DATA
+  ELECTRICITY
+  WATER
+  TV
+}
+
+enum UtilityPaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+model UtilityPayment {
+  id          String               @id @default(uuid())
+  userId      String
+  type        UtilityType
+  provider    String // e.g. "MTN", "Vodafone", "ECG", "GWCL" — the specific operator
+  accountRef  String // phone number / meter number / account number topped up
+  amountCents Int
+  status      UtilityPaymentStatus @default(PENDING)
+  providerRef String?
+  createdAt   DateTime             @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("utility_payments")
+}
+
+// ---- Liquidity: wallet & micro-loans ---------------------------------------
+
+enum WalletTxnType {
+  TOPUP
+  WITHDRAWAL
+  TRANSFER_IN
+  TRANSFER_OUT
+  PAYMENT
+  REFUND
+}
+
+enum LoanStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  DISBURSED
+  REPAID
+  DEFAULTED
+}
+
+model Wallet {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  balanceCents Int      @default(0)
+  currency     String   @default("GHS")
+  updatedAt    DateTime @updatedAt
+
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions WalletTransaction[]
+
+  @@map("wallets")
+}
+
+model WalletTransaction {
+  id                String        @id @default(uuid())
+  walletId          String
+  type              WalletTxnType
+  amountCents       Int
+  balanceAfterCents Int
+  note              String?
+  createdAt         DateTime      @default(now())
+
+  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@index([walletId])
+  @@map("wallet_transactions")
+}
+
+model LoanApplication {
+  id             String     @id @default(uuid())
+  userId         String
+  amountCents    Int
+  purpose        String?
+  status         LoanStatus @default(PENDING)
+  decisionReason String?
+  createdAt      DateTime   @default(now())
+  decidedAt      DateTime?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("loan_applications")
+}
+
+// ---- Fleet: multi-vehicle management for FLEET_OWNER users -----------------
+
+model Fleet {
+  id        String   @id @default(uuid())
+  ownerId   String   @unique
+  name      String
+  createdAt DateTime @default(now())
+
+  owner    User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  vehicles FleetVehicle[]
+
+  @@map("fleets")
+}
+
+model FleetVehicle {
+  id                      String      @id @default(uuid())
+  fleetId                 String
+  type                    VehicleType
+  make                    String
+  model                   String
+  color                   String
+  plateNumber             String      @unique
+  assignedDriverProfileId String?     @unique
+  createdAt               DateTime    @default(now())
+
+  fleet          Fleet          @relation(fields: [fleetId], references: [id], onDelete: Cascade)
+  assignedDriver DriverProfile? @relation(fields: [assignedDriverProfileId], references: [id])
+
+  @@index([fleetId])
+  @@map("fleet_vehicles")
+}
+
+// ---- Property: rentals & listings ------------------------------------------
+
+enum PropertyListingType {
+  RENT
+  SALE
+  SHORT_STAY
+}
+
+enum PropertyListingStatus {
+  ACTIVE
+  PENDING_REVIEW
+  REMOVED
+}
+
+model PropertyListing {
+  id          String                 @id @default(uuid())
+  ownerId     String
+  title       String
+  description String
+  type        PropertyListingType
+  priceCents  Int
+  currency    String                 @default("GHS")
+  area        String
+  lat         Float?
+  lng         Float?
+  bedrooms    Int?
+  status      PropertyListingStatus  @default(PENDING_REVIEW)
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+
+  owner     User              @relation(fields: [ownerId], references: [id])
+  enquiries PropertyEnquiry[]
+
+  @@index([ownerId])
+  @@map("property_listings")
+}
+
+model PropertyEnquiry {
+  id        String   @id @default(uuid())
+  listingId String
+  userId    String
+  message   String
+  createdAt DateTime @default(now())
+
+  listing PropertyListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  user    User            @relation(fields: [userId], references: [id])
+
+  @@index([listingId])
+  @@map("property_enquiries")
+}
+
+// ---- Travel: flights & inter-city bookings ---------------------------------
+
+enum TravelType {
+  FLIGHT
+  BUS
+}
+
+enum TravelBookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+model TravelBooking {
+  id              String              @id @default(uuid())
+  userId          String
+  type            TravelType
+  origin          String
+  destination     String
+  departureDate   DateTime
+  passengerCount  Int                 @default(1)
+  status          TravelBookingStatus @default(PENDING)
+  priceCents      Int?
+  providerRef     String?
+  createdAt       DateTime            @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("travel_bookings")
+}
+
+// ---- Audit log ---------------------------------------------------------
+// Security-review follow-up: a generic, append-only trail for actions that
+// move money or change trust state (payment webhooks, admin verification
+// decisions), so "who did what, when, from where" is answerable without
+// digging through application logs. Deliberately generic (actorId/action/
+// entity/metadata) rather than one table per action type, so new call
+// sites don't need a migration to start logging.
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String? // null for system/webhook-initiated actions (e.g. a payment gateway callback)
+  actorType  String // "USER" | "SYSTEM" | "WEBHOOK"
+  action     String // e.g. "PAYMENT_CONFIRMED", "PAYMENT_FAILED", "ARTISAN_VERIFIED"
+  entityType String // e.g. "Payment", "ArtisanProfile"
+  entityId   String
+  metadata   Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@map("audit_logs")
+}

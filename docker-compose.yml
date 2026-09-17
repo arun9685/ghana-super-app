@@ -1,0 +1,66 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ghsa
+      POSTGRES_PASSWORD: ghsa_dev_password
+      POSTGRES_DB: ghana_super_app
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ghsa -d ghana_super_app"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../infrastructure/docker/backend.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file: ./backend/.env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://ghsa:ghsa_dev_password@postgres:5432/ghana_super_app
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "3000:3000"
+
+  # The web app (customer + driver + admin views in one build, per role —
+  # see frontend/src/App.tsx). Talks to `backend` over the host network at
+  # the URL baked in at build time from frontend/.env, same "container
+  # port mapped to a host port the browser can reach" pattern as backend.
+  frontend:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/frontend.Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000/api/v1}
+        VITE_SOCKET_URL: ${VITE_SOCKET_URL:-http://localhost:3000}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+
+volumes:
+  pgdata:

@@ -1,0 +1,489 @@
+openapi: 3.0.3
+info:
+  title: Ghana Super App (Sankofa) API
+  version: "1.0.0"
+  description: >
+    Maintainability follow-up: this is the first machine-readable description
+    of the API surface — previously it lived only in the zod schemas and
+    route files themselves. Coverage is intentionally uneven right now:
+
+      - Auth, Rides and Payments (the original core loop, and the modules
+        with the deepest test coverage) are fully specified: request/response
+        bodies, status codes, auth requirements.
+      - Every other module (Admin, and the eight service tiles — Eat, Fix,
+        Utilities, Liquidity, Fleet, Property, Travel, plus Drivers,
+        Vehicles, Locations, Notifications, Pricing, Ratings, Support, Users)
+        is listed with its real path, method, tag and auth requirement, but
+        without full request/response schemas yet — filling those in is real,
+        traceable work (see the technical-readiness checklist's
+        "Maintainability" section), not a placeholder to hide.
+
+    All endpoints are under the `/api/v1` base path shown in `servers`.
+    Every response follows one envelope: `{ "success": true, "data": ... }`
+    on success, `{ "success": false, "error": { "code", "message" } }` on
+    failure — this is enforced by errorHandler.ts, not repeated on every
+    operation below.
+servers:
+  - url: /api/v1
+    description: Base path for every route below (see main.ts)
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        Short-lived access token from POST /auth/verify-otp or
+        POST /auth/refresh. Required on every route below except
+        /auth/request-otp, /auth/verify-otp, /auth/refresh and
+        /payments/webhook (which authenticates by HMAC signature instead —
+        see the payments.webhook path and ADR 0002).
+
+  schemas:
+    Envelope:
+      type: object
+      properties:
+        success: { type: boolean }
+        data: {}
+    ErrorEnvelope:
+      type: object
+      properties:
+        success: { type: boolean, example: false }
+        error:
+          type: object
+          properties:
+            code: { type: string, example: "VALIDATION_ERROR" }
+            message: { type: string }
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid access token
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    ValidationError:
+      description: Request body failed schema validation
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    RateLimited:
+      description: Too many requests — see middleware/rateLimiter.ts for the limiter this route uses
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ------------------------------------------------------------------
+  # Auth — fully specified (core loop, most heavily tested)
+  # ------------------------------------------------------------------
+  /auth/request-otp:
+    post:
+      tags: [Auth]
+      summary: Request an OTP code for a phone number
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone]
+              properties:
+                phone: { type: string, example: "0241234567", description: "Ghana-local format (see checklist's E.164 gap)" }
+      responses:
+        "200":
+          description: OTP sent (or logged to console, if SMS_PROVIDER=console)
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/Envelope" } }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /auth/verify-otp:
+    post:
+      tags: [Auth]
+      summary: Verify an OTP and receive an access/refresh token pair
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, code]
+              properties:
+                phone: { type: string }
+                code: { type: string }
+      responses:
+        "200":
+          description: Valid pair issued
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          accessToken: { type: string }
+                          refreshToken: { type: string }
+                          user: { type: object }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Exchange a refresh token for a new access/refresh pair
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties: { refreshToken: { type: string } }
+      responses:
+        "200": { description: New pair issued }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Invalidate the caller's refresh token
+      responses:
+        "200": { description: Logged out }
+
+  # ------------------------------------------------------------------
+  # Rides — fully specified (core loop)
+  # ------------------------------------------------------------------
+  /rides/estimate:
+    post:
+      tags: [Rides]
+      summary: Get a fare estimate for a prospective ride
+      responses:
+        "200": { description: Fare estimate returned }
+  /rides:
+    post:
+      tags: [Rides]
+      summary: Request a ride
+      responses:
+        "201": { description: Ride created, status REQUESTED }
+    get:
+      tags: [Rides]
+      summary: List the caller's own rides
+      responses:
+        "200": { description: Ride list returned }
+  /rides/active-for-driver:
+    get:
+      tags: [Rides]
+      summary: Get the driver's current active ride, if any
+      responses:
+        "200": { description: Active ride or null }
+  /rides/{id}:
+    get:
+      tags: [Rides]
+      summary: Get one ride by id
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: Ride returned }
+        "404": { description: Not found }
+  /rides/{id}/cancel:
+    post:
+      tags: [Rides]
+      summary: Cancel a ride (customer or driver, depending on status)
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: Ride cancelled } }
+  /rides/{id}/arrived:
+    post:
+      tags: [Rides]
+      summary: Driver marks arrival at pickup
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: Ride status updated to ARRIVED } }
+  /rides/{id}/start:
+    post:
+      tags: [Rides]
+      summary: Driver starts the trip
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: Ride status updated to IN_PROGRESS } }
+  /rides/{id}/complete:
+    post:
+      tags: [Rides]
+      summary: Driver completes the trip
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: Ride status updated to COMPLETED, payment created } }
+
+  # ------------------------------------------------------------------
+  # Payments — fully specified (webhook fraud fix, ADR 0002)
+  # ------------------------------------------------------------------
+  /payments:
+    get:
+      tags: [Payments]
+      summary: List the caller's own payments
+      responses: { "200": { description: Payment list returned } }
+  /payments/{id}:
+    get:
+      tags: [Payments]
+      summary: Get one payment by id (must belong to the caller)
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: Payment returned }
+        "404": { description: Not found or not owned by caller }
+  /payments/webhook:
+    post:
+      tags: [Payments]
+      summary: Payment gateway callback — NOT customer-authenticated
+      description: >
+        Authenticated by an HMAC-SHA256 signature over the raw request body
+        (header `X-Signature`, secret PAYMENT_WEBHOOK_SECRET) — see ADR 0002
+        and webhookSignature.ts. This replaced an earlier customer-callable
+        `POST /:id/confirm` that let a customer mark their own payment PAID
+        with no money having moved.
+      security: []
+      parameters:
+        - name: X-Signature
+          in: header
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Payment state updated }
+        "401": { description: Missing or invalid signature }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  # ------------------------------------------------------------------
+  # Everything below: real paths, not yet fully schema'd — see info.description
+  # ------------------------------------------------------------------
+  /users/me:
+    get: { tags: [Users], summary: Get the caller's own profile, responses: { "200": { description: OK } } }
+    patch: { tags: [Users], summary: Update the caller's own profile, responses: { "200": { description: OK } } }
+  /drivers/apply:
+    post: { tags: [Drivers], summary: Apply to become a driver, responses: { "201": { description: Created } } }
+  /drivers/me:
+    get: { tags: [Drivers], summary: Get the caller's own driver profile, responses: { "200": { description: OK } } }
+  /vehicles/me:
+    get: { tags: [Vehicles], summary: Get the caller's own vehicle, responses: { "200": { description: OK } } }
+    put: { tags: [Vehicles], summary: Update the caller's own vehicle, responses: { "200": { description: OK } } }
+  /locations/online:
+    post: { tags: [Locations], summary: Driver goes online, responses: { "200": { description: OK } } }
+  /locations/offline:
+    post: { tags: [Locations], summary: Driver goes offline, responses: { "200": { description: OK } } }
+  /locations/ping:
+    post: { tags: [Locations], summary: Driver location heartbeat, responses: { "200": { description: OK } } }
+  /locations/nearby:
+    get: { tags: [Locations], summary: Find nearby online drivers, responses: { "200": { description: OK } } }
+  /pricing/rules:
+    get: { tags: [Pricing], summary: Get current pricing rules per vehicle type, responses: { "200": { description: OK } } }
+  /ratings:
+    post: { tags: [Ratings], summary: Rate a completed ride, responses: { "201": { description: Created } } }
+    get: { tags: [Ratings], summary: List ratings, responses: { "200": { description: OK } } }
+  /ratings/driver/{driverProfileId}:
+    get:
+      tags: [Ratings]
+      summary: Get a driver's rating summary
+      parameters: [{ name: driverProfileId, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK } }
+  /notifications:
+    get: { tags: [Notifications], summary: List the caller's notifications, responses: { "200": { description: OK } } }
+  /notifications/{id}/read:
+    patch:
+      tags: [Notifications]
+      summary: Mark one notification read
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK } }
+  /notifications/read-all:
+    patch: { tags: [Notifications], summary: Mark all notifications read, responses: { "200": { description: OK } } }
+  /support/tickets:
+    post: { tags: [Support], summary: Open a support ticket, responses: { "201": { description: Created } } }
+    get: { tags: [Support], summary: List the caller's own tickets, responses: { "200": { description: OK } } }
+  /support/tickets/{id}:
+    get:
+      tags: [Support]
+      summary: Get one ticket
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK } }
+  /support/tickets/{id}/messages:
+    post:
+      tags: [Support]
+      summary: Add a message to a ticket
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "201": { description: Created } }
+
+  # Service tiles beyond core Mobility
+  /eat/restaurants:
+    get: { tags: [Eat], summary: List/search restaurants, responses: { "200": { description: OK } } }
+  /eat/restaurants/{id}:
+    get:
+      tags: [Eat]
+      summary: Get one restaurant + menu
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK } }
+  /eat/orders:
+    post: { tags: [Eat], summary: Place a food order, responses: { "201": { description: Created } } }
+    get: { tags: [Eat], summary: List the caller's own orders, responses: { "200": { description: OK } } }
+  /eat/orders/{id}:
+    get:
+      tags: [Eat]
+      summary: Get one order
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK } }
+  /eat/orders/{id}/status:
+    patch:
+      tags: [Eat]
+      summary: Update order status (restaurant/rider side)
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK } }
+  /fix/artisans/apply:
+    post: { tags: [Fix], summary: Apply to become an artisan, responses: { "201": { description: Created } } }
+  /fix/artisans:
+    get: { tags: [Fix], summary: List artisans, responses: { "200": { description: OK } } }
+  /fix/requests:
+    post: { tags: [Fix], summary: Request a service (Fix), responses: { "201": { description: Created } } }
+    get: { tags: [Fix], summary: List service requests, responses: { "200": { description: OK } } }
+  /fix/requests/{id}/accept:
+    post:
+      tags: [Fix]
+      summary: Artisan accepts a job
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK } }
+  /fix/requests/{id}/status:
+    patch:
+      tags: [Fix]
+      summary: Update service request status
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK } }
+  /utilities/pay:
+    post: { tags: [Utilities], summary: Pay a utility bill / buy airtime/data, responses: { "201": { description: Created } } }
+  /utilities:
+    get: { tags: [Utilities], summary: List the caller's utility payments, responses: { "200": { description: OK } } }
+  /liquidity/wallet:
+    get: { tags: [Liquidity], summary: Get wallet balance, responses: { "200": { description: OK } } }
+  /liquidity/wallet/topup:
+    post: { tags: [Liquidity], summary: Top up wallet, responses: { "201": { description: Created } } }
+  /liquidity/loans:
+    post: { tags: [Liquidity], summary: Apply for a loan, responses: { "201": { description: Created } } }
+    get: { tags: [Liquidity], summary: List the caller's own loans, responses: { "200": { description: OK } } }
+  /liquidity/loans/all:
+    get: { tags: [Liquidity], summary: "Admin: list all loans", responses: { "200": { description: OK } } }
+  /liquidity/loans/{id}/decision:
+    patch:
+      tags: [Liquidity]
+      summary: "Admin: approve/reject a loan"
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK } }
+  /fleet:
+    get: { tags: [Fleet], summary: Get the caller's own fleet, responses: { "200": { description: OK } } }
+    post: { tags: [Fleet], summary: Register a fleet, responses: { "201": { description: Created } } }
+  /fleet/vehicles:
+    get: { tags: [Fleet], summary: List fleet vehicles, responses: { "200": { description: OK } } }
+    post: { tags: [Fleet], summary: Add a fleet vehicle, responses: { "201": { description: Created } } }
+  /fleet/vehicles/{id}/assign:
+    post:
+      tags: [Fleet]
+      summary: Assign a driver to a fleet vehicle
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK } }
+  /fleet/vehicles/{id}/unassign:
+    post:
+      tags: [Fleet]
+      summary: Unassign a driver from a fleet vehicle
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK } }
+  /property/listings:
+    get: { tags: [Property], summary: Browse property listings, responses: { "200": { description: OK } } }
+    post: { tags: [Property], summary: Post a property listing, responses: { "201": { description: Created } } }
+  /property/listings/mine:
+    get: { tags: [Property], summary: List the caller's own listings, responses: { "200": { description: OK } } }
+  /property/listings/{id}:
+    get:
+      tags: [Property]
+      summary: Get one listing
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK } }
+  /property/listings/{id}/status:
+    patch:
+      tags: [Property]
+      summary: Update listing status (owner)
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK } }
+  /property/listings/{id}/enquiries:
+    post:
+      tags: [Property]
+      summary: Enquire about a listing
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "201": { description: Created } }
+    get:
+      tags: [Property]
+      summary: List enquiries on a listing (owner)
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK } }
+  /travel/bookings:
+    post: { tags: [Travel], summary: Book bus/flight travel, responses: { "201": { description: Created } } }
+    get: { tags: [Travel], summary: List the caller's own bookings, responses: { "200": { description: OK } } }
+  /travel/bookings/{id}:
+    get:
+      tags: [Travel]
+      summary: Get one booking
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK } }
+  /travel/bookings/{id}/cancel:
+    post:
+      tags: [Travel]
+      summary: Cancel a booking
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK } }
+
+  # Admin — every route requires PLATFORM_ADMIN (adminRouter.use(requireRole(...)))
+  /admin/stats:
+    get: { tags: [Admin], summary: Dashboard aggregate stats, responses: { "200": { description: OK } } }
+  /admin/users:
+    get: { tags: [Admin], summary: "Search/list users (see admin.service.ts for the encrypted-search trade-off, ADR 0003)", responses: { "200": { description: OK } } }
+  /admin/users/{id}:
+    get:
+      tags: [Admin]
+      summary: Get one user
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK } }
+  /admin/rides:
+    get: { tags: [Admin], summary: List rides (optional status filter), responses: { "200": { description: OK } } }
+  /admin/drivers:
+    get: { tags: [Admin], summary: List drivers (optional status filter), responses: { "200": { description: OK } } }
+  /admin/drivers/{id}/verify:
+    patch:
+      tags: [Admin]
+      summary: Approve/reject a driver application
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK } }
+  /admin/pricing/{vehicleType}:
+    patch:
+      tags: [Admin]
+      summary: Update pricing rule for a vehicle type
+      parameters: [{ name: vehicleType, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK } }
+  /admin/support/tickets:
+    get: { tags: [Admin], summary: List all support tickets, responses: { "200": { description: OK } } }
+  /admin/support/tickets/{id}/status:
+    patch:
+      tags: [Admin]
+      summary: Update a support ticket's status
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK } }
+  /admin/artisans:
+    get: { tags: [Admin], summary: List artisans (optional status filter), responses: { "200": { description: OK } } }
+  /admin/artisans/{id}/verify:
+    patch:
+      tags: [Admin]
+      summary: Approve/reject an artisan application
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK } }
+  /admin/property/listings:
+    get: { tags: [Admin], summary: List property listings (moderation queue), responses: { "200": { description: OK } } }
+  /admin/property/listings/{id}/status:
+    patch:
+      tags: [Admin]
+      summary: Moderate a property listing's status
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: OK } }

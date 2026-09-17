@@ -1,0 +1,446 @@
+# Full pipeline (spec §49): Git Push → Build → Lint → Test → Security Scan
+# → Docker Build → Push → Deploy.
+#
+# Two gates added in the technical-readiness follow-up:
+#   - `backend-test`'s `npm run test:coverage` fails under vitest.config.ts's
+#     coverage thresholds (deliberately low today — see that file).
+#   - `docker-build-push` now waits for the ECR image scan and fails the
+#     build on any CRITICAL/HIGH finding, instead of only enabling the scan.
+#
+# Branch → environment mapping:
+#   push to `develop` → build, test, push image, deploy to **staging** ECS
+#   push to `main`    → build, test, push image, deploy to **production** ECS
+#   pull requests     → build, lint, test, security scan only — never deploy
+#
+# PREREQUISITE this pipeline cannot satisfy for you: prisma/migrations/
+# must exist and be committed. This sandbox has never had a live Postgres
+# to run `prisma migrate dev` against (that's what generates migration SQL
+# by diffing schema.prisma against a real database), so no migrations/
+# folder has ever been created here — `backend-test`'s `prisma migrate
+# deploy` step below will find nothing to apply and the tests that follow
+# will fail against an empty database. On your machine, once, run:
+#   cd backend && npm run prisma:migrate -- --name init
+# (or whatever migration name matches where your local DB already is) and
+# commit the resulting prisma/migrations/ folder. After that, every
+# schema.prisma change in this repo (including the AuditLog model from the
+# payment-webhook fix, and User.phoneHash from the PII-encryption fix —
+# see root README's "Security" section for both) needs its own
+# `prisma:migrate` run + commit the same way.
+#
+# Deploying requires the AWS infrastructure in infrastructure/terraform to
+# already be applied (it provisions the ECR repo, ECS cluster/service, the
+# Secrets Manager entries the task reads at boot, and the OIDC role this
+# workflow assumes — see github_oidc.tf). Until that's done, the
+# build/test/docker-build jobs still run and are still useful; only the
+# `deploy` job needs AWS and will simply not run (see its `if:`).
+#
+# One-time setup once the Terraform above has been applied, per environment
+# ("staging" and "production" under Settings → Environments):
+#   Secrets:
+#     AWS_ROLE_ARN        — terraform output github_actions_deploy_role_arn
+#   Variables:
+#     AWS_REGION          — e.g. eu-west-1 (must match terraform var.aws_region)
+#     ECR_REPOSITORY_URL  — terraform output ecr_repository_url
+#     ECS_CLUSTER         — terraform output ecs_cluster_name
+#     ECS_SERVICE         — terraform output ecs_service_name
+#     ECS_TASK_FAMILY     — terraform output ecs_task_family
+#   Also give the "production" environment a required-reviewers protection
+#   rule in GitHub so a human approves before anything reaches prod — the
+#   workflow itself doesn't gate that, GitHub's environment protection does.
+
+name: CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  # Manual trigger — runs the exact same pipeline as a push, against
+  # whichever branch you run it on (pick the branch in the "Run workflow"
+  # dropdown). Useful to redeploy after only changing a GitHub
+  # Environment's variables/secrets, with no code change to push.
+  workflow_dispatch: {}
+
+jobs:
+  # ---------------------------------------------------------------------
+  # Build, lint, test, security-scan the backend
+  # ---------------------------------------------------------------------
+  backend-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ghsa
+          POSTGRES_PASSWORD: ghsa_test_password
+          POSTGRES_DB: ghana_super_app_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ghsa" --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 5s --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://ghsa:ghsa_test_password@localhost:5432/ghana_super_app_test
+      REDIS_URL: redis://localhost:6379
+      JWT_ACCESS_SECRET: ci_test_access_secret_not_for_prod
+      JWT_REFRESH_SECRET: ci_test_refresh_secret_not_for_prod
+      PAYMENT_WEBHOOK_SECRET: ci_test_webhook_secret_not_for_prod
+      # Exactly 64 hex chars — env.ts validates this shape at boot (it's
+      # an AES-256 key). Test-only value, never used outside CI.
+      PII_ENCRYPTION_KEY: aaaaaaaabbbbbbbbccccccccddddddddaaaaaaaabbbbbbbbccccccccdddddddd
+      PII_HASH_KEY: ci_test_hash_key_not_for_prod
+      SMS_PROVIDER: console
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Prisma generate + migrate
+        run: |
+          npx prisma generate
+          npx prisma migrate deploy
+
+      - name: Unit + integration tests (with coverage)
+        # `test:coverage` runs vitest with `--coverage`, which fails the
+        # command (not just prints a report) if any of vitest.config.ts's
+        # `coverage.thresholds` aren't met — see that file for why the
+        # numbers are set deliberately low right now.
+        run: npm run test:coverage
+
+      - name: Build
+        run: npm run build
+
+      - name: Dependency vulnerability scan (informational)
+        run: npm audit --audit-level=high || true
+        # Reports high+critical advisories without failing the build —
+        # transitive dependencies get flagged faster than they can always
+        # be triaged/patched. The step below is the actual gate.
+
+      - name: Dependency vulnerability scan (blocking on critical)
+        run: npm audit --audit-level=critical
+        # Fails the pipeline only on CRITICAL advisories. This is
+        # deliberately narrower than the informational step above — flip
+        # this to `--audit-level=high` once the project has a documented
+        # process for triaging/accepting individual high-severity advisories
+        # (some are unfixable transitive deps with no real exploit path here).
+
+  # ---------------------------------------------------------------------
+  # Build, lint the frontend
+  # ---------------------------------------------------------------------
+  frontend-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_API_URL: /api/v1 # placeholder for CI's build-only check; the real deploy build (docker-build below) sets this per environment
+
+      - name: Dependency vulnerability scan (informational)
+        run: npm audit --audit-level=high || true
+
+      - name: Build frontend Docker image (validation only — not pushed anywhere)
+        run: |
+          docker build \
+            -f infrastructure/docker/frontend.Dockerfile \
+            -t ghana-super-app-frontend:${{ github.sha }} \
+            --build-arg VITE_API_URL=/api/v1 \
+            .
+        working-directory: .
+        # Production is served from S3 + CloudFront (frontend-deploy job
+        # below), not this Docker image — this build stays purely as a
+        # local `docker-compose up` / nginx-config validation check, so a
+        # broken Dockerfile is caught here even though it isn't deployed.
+
+  # ---------------------------------------------------------------------
+  # Analyze, test, build the mobile app (Android APK). No iOS build here —
+  # that needs a macOS runner (real cost/minutes), and there's no way to
+  # sign/notarize it without Apple developer credentials this project
+  # doesn't have; add a macos-latest job with `flutter build ios --no-codesign`
+  # later if that's ever needed, purely as a compile check.
+  # ---------------------------------------------------------------------
+  mobile-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.24.0"
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze (lint)
+        run: flutter analyze
+
+      - name: Format check
+        run: dart format --output=none --set-exit-if-changed .
+
+      - name: Run tests
+        run: flutter test
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: sankofa-mobile-apk-${{ github.sha }}
+          path: mobile/build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 14
+
+  # ---------------------------------------------------------------------
+  # Build & push the backend image. Runs on pushes only (never on a PR —
+  # a PR from a fork shouldn't be able to push images or touch cloud infra).
+  # ---------------------------------------------------------------------
+  docker-build-push:
+    needs: [backend-test, frontend-build]
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # needed to mint the OIDC token for AWS
+      packages: write # needed to push to GHCR
+    environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
+    outputs:
+      image_uri: ${{ steps.resolve-image.outputs.image_uri }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Always available, zero setup: gives every push a real, pullable
+      # image even before any AWS infrastructure exists.
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push backend image to GHCR
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          file: infrastructure/docker/backend.Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/backend:${{ github.sha }}
+            ghcr.io/${{ github.repository }}/backend:${{ github.ref_name }}-latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Only runs once the Terraform in infrastructure/terraform has been
+      # applied and this environment's AWS_ROLE_ARN secret is set — see the
+      # header comment. Until then this step (and the deploy job) simply
+      # don't run; everything above still does.
+      - name: Configure AWS credentials (OIDC)
+        if: ${{ vars.ECR_REPOSITORY_URL != '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        if: ${{ vars.ECR_REPOSITORY_URL != '' }}
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & push backend image to ECR
+        if: ${{ vars.ECR_REPOSITORY_URL != '' }}
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          file: infrastructure/docker/backend.Dockerfile
+          push: true
+          # ECR repo is IMMUTABLE (ecr.tf) — a tag can only ever be pushed
+          # once, so this must be unique per push. The commit sha is exactly that.
+          tags: ${{ vars.ECR_REPOSITORY_URL }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Gap this closes: ECR's `scan_on_push` (ecr.tf) has always run a scan
+      # on every push, but nothing ever looked at the RESULT — an image
+      # with known CRITICAL/HIGH CVEs could still sail through to `deploy`.
+      # This blocks the pipeline on that result instead of just collecting
+      # it. Repository name is the fixed one ecr.tf declares
+      # ("ghana-super-app-backend" — a single shared repo across
+      # environments, distinguished by tag, not by repo).
+      - name: Wait for ECR image scan to complete
+        if: ${{ vars.ECR_REPOSITORY_URL != '' }}
+        run: |
+          aws ecr wait image-scan-complete \
+            --repository-name ghana-super-app-backend \
+            --image-id imageTag=${{ github.sha }}
+
+      - name: Fail build on CRITICAL/HIGH vulnerabilities
+        if: ${{ vars.ECR_REPOSITORY_URL != '' }}
+        run: |
+          COUNTS=$(aws ecr describe-image-scan-findings \
+            --repository-name ghana-super-app-backend \
+            --image-id imageTag=${{ github.sha }} \
+            --query 'imageScanFindings.findingSeverityCounts' \
+            --output json)
+          echo "Finding severity counts: $COUNTS"
+          CRITICAL=$(echo "$COUNTS" | jq -r '.CRITICAL // 0')
+          HIGH=$(echo "$COUNTS" | jq -r '.HIGH // 0')
+          if [ "$CRITICAL" -gt 0 ] || [ "$HIGH" -gt 0 ]; then
+            echo "::error::Image ${{ github.sha }} has $CRITICAL CRITICAL and $HIGH HIGH severity vulnerabilities — blocking deploy."
+            echo "See the ECR console (repository ghana-super-app-backend, tag ${{ github.sha }}) for the full finding list."
+            exit 1
+          fi
+
+      - name: Resolve image URI for the deploy job
+        id: resolve-image
+        run: |
+          if [ -n "${{ vars.ECR_REPOSITORY_URL }}" ]; then
+            echo "image_uri=${{ vars.ECR_REPOSITORY_URL }}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "image_uri=" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ---------------------------------------------------------------------
+  # Deploy to ECS. Only runs once AWS infra exists (ECR_REPOSITORY_URL set)
+  # — see the header comment for one-time setup. Uses the GitHub
+  # Environment matching the branch, so put a required-reviewers rule on
+  # "production" if you want a human gate before it goes live.
+  # ---------------------------------------------------------------------
+  deploy:
+    needs: docker-build-push
+    if: needs.docker-build-push.outputs.image_uri != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Fetch current task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition ${{ vars.ECS_TASK_FAMILY }} \
+            --query taskDefinition > task-definition.json
+
+      - name: Render new image into the task definition
+        id: render-task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: backend
+          image: ${{ needs.docker-build-push.outputs.image_uri }}
+
+      - name: Deploy to ECS (register revision, update service, wait for stability)
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render-task-def.outputs.task-definition }}
+          cluster: ${{ vars.ECS_CLUSTER }}
+          service: ${{ vars.ECS_SERVICE }}
+          wait-for-service-stability: true
+
+  # ---------------------------------------------------------------------
+  # Deploy the frontend to S3 + CloudFront (infrastructure/terraform's
+  # frontend_hosting.tf — added alongside this job, since one is useless
+  # without the other). Only runs once that Terraform has been applied
+  # (FRONTEND_S3_BUCKET set); gated on push/workflow_dispatch the same way
+  # docker-build-push is, and independent of the backend `deploy` job so a
+  # frontend-only change doesn't wait on an ECS deploy that isn't needed.
+  #
+  # Extra one-time setup, per environment, beyond what the header comment
+  # already lists:
+  #   Variables:
+  #     FRONTEND_S3_BUCKET             — terraform output frontend_bucket
+  #     FRONTEND_CLOUDFRONT_DIST_ID    — terraform output frontend_cloudfront_distribution_id
+  #     VITE_API_URL                   — e.g. https://api.yourdomain.com/api/v1 (terraform output alb_dns_name until a real domain/HTTPS listener exists — see alb.tf)
+  #     VITE_SOCKET_URL                — usually the same origin as VITE_API_URL, without the /api/v1 suffix
+  # ---------------------------------------------------------------------
+  frontend-deploy:
+    needs: [backend-test, frontend-build]
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') && vars.FRONTEND_S3_BUCKET != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (production API/socket URLs)
+        run: npm run build
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_SOCKET_URL: ${{ vars.VITE_SOCKET_URL }}
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Sync build output to S3
+        run: |
+          aws s3 sync dist/ "s3://${{ vars.FRONTEND_S3_BUCKET }}" --delete
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ vars.FRONTEND_CLOUDFRONT_DIST_ID }}" \
+            --paths "/*"

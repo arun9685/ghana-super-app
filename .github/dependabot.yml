@@ -1,0 +1,44 @@
+# Upgradability follow-up: dependency bumps were entirely manual before
+# this — nothing watched for new releases or known-vulnerable versions
+# between whenever someone happened to run `npm outdated`. Dependabot
+# covers every ecosystem this repo actually has a manifest for; each
+# entry opens its own PRs on its own schedule so a backend bump doesn't
+# get bundled with an unrelated Terraform provider bump.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    groups:
+      # Patch/minor bumps of same-scope packages land as one PR instead of
+      # ten separate ones for a routine week — security (major-severity)
+      # updates are excluded from grouping so they're never held up behind
+      # an unrelated package in the same group.
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "docker"
+    directory: "/infrastructure/docker"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "terraform"
+    directory: "/infrastructure/terraform"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

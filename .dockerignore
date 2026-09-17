@@ -1,0 +1,18 @@
+# Applies to the repo-root build context (the frontend image — see
+# docker-compose.yml and infrastructure/docker/frontend.Dockerfile).
+# Same reasoning as backend/.dockerignore: keeps host-installed
+# artifacts out of the build context so they can't clobber what the
+# container installs for itself, and keeps the context small.
+
+**/node_modules
+**/dist
+**/coverage
+**/.env
+**/.env.*
+!**/.env.example
+
+.git
+.gitignore
+.vscode
+*.log
+npm-debug.log*

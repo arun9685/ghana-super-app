@@ -1,0 +1,232 @@
+/* Design tokens ported from the approved Sankofa POC (sankofa-app.jsx /
+   sankofa-web.jsx's `T`/`SH` objects) — same hex values, same shadow
+   recipes, same font stack, so the real app matches the approved look
+   instead of an invented navy/gold palette. Variable names kept
+   generic (--primary/--primary-dark/--accent/etc.) so every page that
+   already references them picks up the correct look automatically. */
+:root {
+  --ink: #0b0f0d;
+  --ink2: #161c19;
+  --slate: #5b6661;
+  --mute: #8a938e;
+  --hair: #e8ebe9;
+  --bg: #f5f7f6;
+  --white: #ffffff;
+
+  --green: #0a7a4b;
+  --green-dark: #065c38;
+  --green-light: #e6f4ed;
+  --gold: #f0b429;
+  --gold-dark: #b07d08;
+  --red: #d64545;
+  --blue: #2b6cb0;
+  --purple: #6b46c1;
+  --teal: #2c7a7b;
+  --brown: #8b5e34;
+  --service-travel: #1f7a8c;
+
+  /* Legacy aliases — kept so every page already written against the
+     original navy/gold token names (buttons, pills, hero gradients)
+     repaints in the POC's real palette without a page-by-page rewrite. */
+  --navy: var(--green);
+  --navy-dark: var(--green-dark);
+  --navy-light: #12a06a;
+  --gold-light: #f5c860;
+  --cream: var(--bg);
+  --gray-100: var(--bg);
+  --gray-200: var(--hair);
+  --gray-400: var(--mute);
+  --gray-600: var(--slate);
+  --gray-800: var(--ink2);
+
+  --radius-sm: 11px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+  --shadow-card: 0 1px 3px rgba(11, 15, 13, 0.07), 0 8px 24px rgba(11, 15, 13, 0.06);
+  --shadow-pop: 0 12px 32px rgba(11, 15, 13, 0.14), 0 32px 64px rgba(11, 15, 13, 0.1);
+  --font-display: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, .display {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: var(--ink);
+  margin: 0;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+}
+
+input, select, textarea {
+  font-family: inherit;
+  font-size: 15px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 13px 22px;
+  border-radius: var(--radius-md);
+  font-weight: 700;
+  font-size: 15px;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
+}
+.btn:active { transform: scale(0.98); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-gold {
+  background: var(--gold);
+  color: var(--ink);
+  box-shadow: 0 8px 20px rgba(240, 180, 41, 0.35);
+}
+.btn-navy {
+  background: var(--green);
+  color: var(--white);
+}
+.btn-outline {
+  background: transparent;
+  color: var(--ink);
+  border: 1.5px solid var(--hair);
+}
+.btn-danger {
+  background: var(--red);
+  color: white;
+}
+.btn-block { width: 100%; }
+.btn-sm { padding: 9px 16px; font-size: 13px; border-radius: var(--radius-sm); }
+
+.card {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: 20px;
+}
+
+.input {
+  width: 100%;
+  padding: 13px 16px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--hair);
+  background: var(--white);
+  outline: none;
+  transition: border-color 0.12s ease;
+}
+.input:focus { border-color: var(--gold); }
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.pill-gold { background: rgba(240, 180, 41, 0.16); color: var(--gold-dark); }
+.pill-green { background: var(--green-light); color: var(--green); }
+.pill-red { background: rgba(214, 69, 69, 0.12); color: var(--red); }
+.pill-gray { background: var(--hair); color: var(--slate); }
+.pill-navy { background: var(--green-light); color: var(--green); }
+
+.container {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: var(--hair); border-radius: 8px; }
+
+.pulse-dot { animation: pulse 1.4s ease-in-out infinite; display: inline-block; }
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.15); opacity: 0.6; }
+}
+
+/* ---- POC-aligned visual pass: gradient hero surfaces, motion on cards,
+   and a shared "tile" look for the service-tile grid used across Move,
+   Eat, Fix, Utilities, Liquidity, Fleet, Property and Travel. ---- */
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-up { animation: fadeUp 0.35s ease both; }
+
+.hero-gradient {
+  background: linear-gradient(165deg, var(--green) 0%, var(--green-dark) 100%);
+  color: var(--white);
+  border-radius: var(--radius-lg);
+  position: relative;
+  overflow: hidden;
+}
+.hero-gradient::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.09;
+  background: repeating-linear-gradient(45deg, #fff 0 1px, transparent 1px 26px);
+  pointer-events: none;
+}
+
+.tile-card {
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+.tile-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-pop);
+}
+.tile-card.tile-disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.tile-card.tile-disabled:hover {
+  transform: none;
+  box-shadow: var(--shadow-card);
+}
+.tile-icon-badge {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gradient-accent-bar {
+  height: 4px;
+  width: 100%;
+  border-radius: 999px;
+  background: var(--gold);
+  margin-bottom: 14px;
+}
+
+.status-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.status-strip::-webkit-scrollbar { height: 0; }

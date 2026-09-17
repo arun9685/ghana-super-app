@@ -1,0 +1,28 @@
+name: sankofa_mobile
+description: Sankofa (Ghana Super App) — Move flow native mobile client, wired to the real backend built in ../backend.
+publish_to: "none"
+version: 0.1.0
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+# This source tree is written to be dropped into a Flutter project shell.
+# This sandbox has no Flutter SDK, so it could not be run with
+# `flutter pub get` / `flutter run` here — see mobile/README.md for the
+# exact steps to scaffold and run it on your machine.
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.0
+  socket_io_client: ^2.0.3
+  provider: ^6.1.2
+  shared_preferences: ^2.2.3
+  intl: ^0.19.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
