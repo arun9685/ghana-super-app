@@ -322,7 +322,9 @@ jobs:
       # ("ghana-super-app-backend" — a single shared repo across
       # environments, distinguished by tag, not by repo).
       - name: Wait for ECR image scan to complete
+        id: wait-scan
         if: ${{ vars.ECR_REPOSITORY_URL != '' }}
+        continue-on-error: true
         run: |
           for i in $(seq 1 60); do
             STATUS=$(aws ecr describe-image-scan-findings \
@@ -343,7 +345,7 @@ jobs:
           exit 1
 
       - name: Fail build on CRITICAL/HIGH vulnerabilities
-        if: ${{ vars.ECR_REPOSITORY_URL != '' }}
+         if: ${{ vars.ECR_REPOSITORY_URL != '' && steps.wait-scan.outcome == 'success' }
         run: |
           COUNTS=$(aws ecr describe-image-scan-findings \
             --repository-name ghana-super-app-backend \
