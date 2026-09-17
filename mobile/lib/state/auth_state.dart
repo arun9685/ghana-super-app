@@ -31,8 +31,10 @@ class AuthState extends ChangeNotifier {
   }
 
   Future<void> verifyOtp(String phone, String otp) async {
-    final data = await ApiClient.instance.post('/auth/verify-otp', body: {'phone': phone, 'otp': otp});
-    await ApiClient.instance.setTokens(data['accessToken'], data['refreshToken']);
+    final data = await ApiClient.instance
+        .post('/auth/verify-otp', body: {'phone': phone, 'otp': otp});
+    await ApiClient.instance
+        .setTokens(data['accessToken'], data['refreshToken']);
     me = Me.fromJson(data['user']);
     SocketService.instance.connect(data['accessToken']);
     notifyListeners();

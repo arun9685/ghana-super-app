@@ -67,5 +67,6 @@ class Ride {
         driver: json['driverProfile'],
       );
 
-  String get formattedFare => '$currency ${(( finalFareCents ?? estimatedFareCents) / 100).toStringAsFixed(2)}';
+  String get formattedFare =>
+      '$currency ${((finalFareCents ?? estimatedFareCents) / 100).toStringAsFixed(2)}';
 }

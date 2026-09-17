@@ -7,7 +7,6 @@ import 'screens/driver/driver_apply_screen.dart';
 import 'screens/driver/driver_dashboard_screen.dart';
 import 'config/theme.dart';
 
-
 void main() {
   runApp(
     ChangeNotifierProvider(
@@ -27,7 +26,8 @@ class SankofaApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: navy, primary: navy, secondary: gold),
+        colorScheme: ColorScheme.fromSeed(
+            seedColor: navy, primary: navy, secondary: gold),
         fontFamily: 'Roboto',
         scaffoldBackgroundColor: bg,
         cardTheme: const CardTheme(elevation: 1, shadowColor: Colors.black12),
@@ -65,7 +65,8 @@ class _RootRouterState extends State<_RootRouter> {
     final isDriver = auth.me!.roles.contains('DRIVER');
     if (isDriver) return const DriverDashboardScreen();
     if (_showDriverApply) {
-      return DriverApplyScreen(onBack: () => setState(() => _showDriverApply = false));
+      return DriverApplyScreen(
+          onBack: () => setState(() => _showDriverApply = false));
     }
 
     return Scaffold(

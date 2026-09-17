@@ -37,7 +37,8 @@ class SankofaMark extends StatelessWidget {
       decoration: BoxDecoration(
         color: light ? Colors.white.withOpacity(0.16) : navy,
         borderRadius: BorderRadius.circular(size * 0.29),
-        border: light ? Border.all(color: Colors.white.withOpacity(0.28)) : null,
+        border:
+            light ? Border.all(color: Colors.white.withOpacity(0.28)) : null,
       ),
       child: CustomPaint(painter: _ArrowPainter(), size: Size(size, size)),
     );
@@ -60,7 +61,8 @@ class _ArrowPainter extends CustomPainter {
     // Same two paths as the POC's inline SVG logo mark: a hooked arc
     // ("M17 7.5A5.5 5.5 0 1 0 8.5 16") plus its arrowhead
     // ("M13 3.5 17 7.5l-4 4"), approximated with Flutter's arc/line APIs.
-    final arcRect = Rect.fromCircle(center: pt(12.5, 11.5), radius: 5.5 * scale);
+    final arcRect =
+        Rect.fromCircle(center: pt(12.5, 11.5), radius: 5.5 * scale);
     canvas.drawArc(arcRect, -1.65, 4.9, false, paint);
 
     final arrowPath = Path()

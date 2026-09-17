@@ -16,7 +16,8 @@ class _EatScreenState extends State<EatScreen> {
   List<dynamic> _restaurants = [];
   bool _loading = true;
   String? _error;
-  final Map<String, Map<String, dynamic>> _cart = {}; // menuItemId -> {restaurantId, item, qty}
+  final Map<String, Map<String, dynamic>> _cart =
+      {}; // menuItemId -> {restaurantId, item, qty}
 
   @override
   void initState() {
@@ -41,14 +42,22 @@ class _EatScreenState extends State<EatScreen> {
 
   void _addToCart(String restaurantId, Map<String, dynamic> item) {
     setState(() {
-      final currentRestaurant = _cart.values.isNotEmpty ? _cart.values.first['restaurantId'] as String : null;
-      if (currentRestaurant != null && currentRestaurant != restaurantId) _cart.clear();
+      final currentRestaurant = _cart.values.isNotEmpty
+          ? _cart.values.first['restaurantId'] as String
+          : null;
+      if (currentRestaurant != null && currentRestaurant != restaurantId)
+        _cart.clear();
       final existing = _cart[item['id']];
-      _cart[item['id']] = {'restaurantId': restaurantId, 'item': item, 'qty': (existing?['qty'] ?? 0) + 1};
+      _cart[item['id']] = {
+        'restaurantId': restaurantId,
+        'item': item,
+        'qty': (existing?['qty'] ?? 0) + 1
+      };
     });
   }
 
-  int get _cartTotalCents => _cart.values.fold(0, (sum, c) => sum + ((c['item']['priceCents'] as int) * (c['qty'] as int)));
+  int get _cartTotalCents => _cart.values.fold(0,
+      (sum, c) => sum + ((c['item']['priceCents'] as int) * (c['qty'] as int)));
 
   Future<void> _placeOrder() async {
     if (_cart.isEmpty) return;
@@ -56,7 +65,9 @@ class _EatScreenState extends State<EatScreen> {
     try {
       final order = await ApiClient.instance.post('/eat/orders', body: {
         'restaurantId': restaurantId,
-        'items': _cart.values.map((c) => {'menuItemId': c['item']['id'], 'quantity': c['qty']}).toList(),
+        'items': _cart.values
+            .map((c) => {'menuItemId': c['item']['id'], 'quantity': c['qty']})
+            .toList(),
         'deliveryAddress': 'My saved address',
         'deliveryLat': 5.6037,
         'deliveryLng': -0.187,
@@ -64,7 +75,10 @@ class _EatScreenState extends State<EatScreen> {
       });
       setState(() => _cart.clear());
       if (!mounted) return;
-      Navigator.push(context, MaterialPageRoute(builder: (_) => EatOrderDetailScreen(orderId: order['id'])));
+      Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (_) => EatOrderDetailScreen(orderId: order['id'])));
     } on ApiException catch (e) {
       setState(() => _error = e.message);
     }
@@ -81,7 +95,8 @@ class _EatScreenState extends State<EatScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.receipt_long),
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EatOrdersScreen())),
+            onPressed: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const EatOrdersScreen())),
           ),
         ],
       ),
@@ -92,8 +107,14 @@ class _EatScreenState extends State<EatScreen> {
               : ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
-                    for (final r in _restaurants) _RestaurantCard(restaurant: r, onAdd: _addToCart),
-                    if (_restaurants.isEmpty) const Padding(padding: EdgeInsets.only(top: 40), child: Center(child: Text('No restaurants available yet.', style: TextStyle(color: slate)))),
+                    for (final r in _restaurants)
+                      _RestaurantCard(restaurant: r, onAdd: _addToCart),
+                    if (_restaurants.isEmpty)
+                      const Padding(
+                          padding: EdgeInsets.only(top: 40),
+                          child: Center(
+                              child: Text('No restaurants available yet.',
+                                  style: TextStyle(color: slate)))),
                   ],
                 ),
       bottomNavigationBar: _cart.isNotEmpty
@@ -102,8 +123,12 @@ class _EatScreenState extends State<EatScreen> {
                 padding: const EdgeInsets.all(12),
                 child: ElevatedButton(
                   onPressed: _placeOrder,
-                  style: ElevatedButton.styleFrom(backgroundColor: gold, foregroundColor: ink, padding: const EdgeInsets.symmetric(vertical: 16)),
-                  child: Text('Place order · GHS ${(_cartTotalCents / 100).toStringAsFixed(2)}'),
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: gold,
+                      foregroundColor: ink,
+                      padding: const EdgeInsets.symmetric(vertical: 16)),
+                  child: Text(
+                      'Place order · GHS ${(_cartTotalCents / 100).toStringAsFixed(2)}'),
                 ),
               ),
             )
@@ -128,8 +153,11 @@ class _RestaurantCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(restaurant['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            Text('${restaurant['area'] ?? ''}', style: const TextStyle(fontSize: 12.5, color: slate)),
+            Text(restaurant['name'] ?? '',
+                style:
+                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            Text('${restaurant['area'] ?? ''}',
+                style: const TextStyle(fontSize: 12.5, color: slate)),
             const SizedBox(height: 10),
             for (final item in menuItems)
               Padding(
@@ -140,14 +168,22 @@ class _RestaurantCard extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(item['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
-                          Text('GHS ${((item['priceCents'] as int) / 100).toStringAsFixed(2)}', style: const TextStyle(fontSize: 12.5, color: slate)),
+                          Text(item['name'] ?? '',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w600, fontSize: 13.5)),
+                          Text(
+                              'GHS ${((item['priceCents'] as int) / 100).toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                  fontSize: 12.5, color: slate)),
                         ],
                       ),
                     ),
                     TextButton(
                       onPressed: () => onAdd(restaurant['id'], item),
-                      style: TextButton.styleFrom(backgroundColor: navy, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 14)),
+                      style: TextButton.styleFrom(
+                          backgroundColor: navy,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 14)),
                       child: const Text('Add'),
                     ),
                   ],
@@ -174,14 +210,23 @@ class _EatOrdersScreenState extends State<EatOrdersScreen> {
   void initState() {
     super.initState();
     ApiClient.instance.get('/eat/orders').then((data) {
-      if (mounted) setState(() { _orders = data as List; _loading = false; });
-    }).catchError((_) { if (mounted) setState(() => _loading = false); });
+      if (mounted)
+        setState(() {
+          _orders = data as List;
+          _loading = false;
+        });
+    }).catchError((_) {
+      if (mounted) setState(() => _loading = false);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('My orders'), backgroundColor: navy, foregroundColor: Colors.white),
+      appBar: AppBar(
+          title: const Text('My orders'),
+          backgroundColor: navy,
+          foregroundColor: Colors.white),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
@@ -192,10 +237,19 @@ class _EatOrdersScreenState extends State<EatOrdersScreen> {
                     child: ListTile(
                       title: Text(o['restaurant']?['name'] ?? ''),
                       subtitle: Text(o['status'] ?? ''),
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => EatOrderDetailScreen(orderId: o['id']))),
+                      onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) =>
+                                  EatOrderDetailScreen(orderId: o['id']))),
                     ),
                   ),
-                if (_orders.isEmpty) const Center(child: Padding(padding: EdgeInsets.only(top: 40), child: Text('No orders yet.', style: TextStyle(color: slate)))),
+                if (_orders.isEmpty)
+                  const Center(
+                      child: Padding(
+                          padding: EdgeInsets.only(top: 40),
+                          child: Text('No orders yet.',
+                              style: TextStyle(color: slate)))),
               ],
             ),
     );
@@ -227,23 +281,33 @@ class _EatOrderDetailScreenState extends State<EatOrderDetailScreen> {
   Widget build(BuildContext context) {
     final order = _order;
     return Scaffold(
-      appBar: AppBar(title: const Text('Order'), backgroundColor: navy, foregroundColor: Colors.white),
+      appBar: AppBar(
+          title: const Text('Order'),
+          backgroundColor: navy,
+          foregroundColor: Colors.white),
       body: order == null
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                Text(order['restaurant']?['name'] ?? '', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                Text(order['restaurant']?['name'] ?? '',
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
-                Chip(label: Text(order['status'] ?? ''), backgroundColor: navyLight),
+                Chip(
+                    label: Text(order['status'] ?? ''),
+                    backgroundColor: navyLight),
                 const SizedBox(height: 16),
                 for (final it in (order['items'] as List? ?? []))
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Text('${it['quantity']}× ${it['menuItem']?['name'] ?? ''}'),
+                    child: Text(
+                        '${it['quantity']}× ${it['menuItem']?['name'] ?? ''}'),
                   ),
                 const Divider(),
-                Text('Total: GHS ${((order['totalCents'] as int? ?? 0) / 100).toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(
+                    'Total: GHS ${((order['totalCents'] as int? ?? 0) / 100).toStringAsFixed(2)}',
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
               ],
             ),
     );

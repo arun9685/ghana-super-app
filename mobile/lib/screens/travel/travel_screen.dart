@@ -45,7 +45,11 @@ class _TravelScreenState extends State<TravelScreen> {
 
   Future<void> _pickDate() async {
     final now = DateTime.now();
-    final picked = await showDatePicker(context: context, initialDate: now, firstDate: now, lastDate: now.add(const Duration(days: 365)));
+    final picked = await showDatePicker(
+        context: context,
+        initialDate: now,
+        firstDate: now,
+        lastDate: now.add(const Duration(days: 365)));
     if (picked != null) setState(() => _departureDate = picked);
   }
 
@@ -93,13 +97,20 @@ class _TravelScreenState extends State<TravelScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: bg,
-      appBar: AppBar(title: const Text('Travel'), backgroundColor: travelTeal, foregroundColor: Colors.white),
+      appBar: AppBar(
+          title: const Text('Travel'),
+          backgroundColor: travelTeal,
+          foregroundColor: Colors.white),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          if (_error != null) Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(_error!, style: const TextStyle(color: red))),
+          if (_error != null)
+            Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(_error!, style: const TextStyle(color: red))),
           Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -110,9 +121,13 @@ class _TravelScreenState extends State<TravelScreen> {
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: () => setState(() => _type = 'BUS'),
-                          icon: const Icon(Icons.local_shipping_rounded, size: 16),
+                          icon: const Icon(Icons.local_shipping_rounded,
+                              size: 16),
                           label: const Text('Bus'),
-                          style: OutlinedButton.styleFrom(backgroundColor: _type == 'BUS' ? navy : null, foregroundColor: _type == 'BUS' ? Colors.white : navy),
+                          style: OutlinedButton.styleFrom(
+                              backgroundColor: _type == 'BUS' ? navy : null,
+                              foregroundColor:
+                                  _type == 'BUS' ? Colors.white : navy),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -121,37 +136,64 @@ class _TravelScreenState extends State<TravelScreen> {
                           onPressed: () => setState(() => _type = 'FLIGHT'),
                           icon: const Icon(Icons.flight_rounded, size: 16),
                           label: const Text('Flight'),
-                          style: OutlinedButton.styleFrom(backgroundColor: _type == 'FLIGHT' ? navy : null, foregroundColor: _type == 'FLIGHT' ? Colors.white : navy),
+                          style: OutlinedButton.styleFrom(
+                              backgroundColor: _type == 'FLIGHT' ? navy : null,
+                              foregroundColor:
+                                  _type == 'FLIGHT' ? Colors.white : navy),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 14),
-                  TextField(controller: _originController, decoration: const InputDecoration(labelText: 'From', hintText: 'Accra', border: OutlineInputBorder())),
+                  TextField(
+                      controller: _originController,
+                      decoration: const InputDecoration(
+                          labelText: 'From',
+                          hintText: 'Accra',
+                          border: OutlineInputBorder())),
                   const SizedBox(height: 10),
-                  TextField(controller: _destinationController, decoration: const InputDecoration(labelText: 'To', hintText: 'Kumasi', border: OutlineInputBorder())),
+                  TextField(
+                      controller: _destinationController,
+                      decoration: const InputDecoration(
+                          labelText: 'To',
+                          hintText: 'Kumasi',
+                          border: OutlineInputBorder())),
                   const SizedBox(height: 10),
                   InkWell(
                     onTap: _pickDate,
                     child: InputDecorator(
-                      decoration: const InputDecoration(labelText: 'Departure date', border: OutlineInputBorder()),
-                      child: Text(_departureDate == null ? 'Select date' : '${_departureDate!.toLocal()}'.split(' ').first),
+                      decoration: const InputDecoration(
+                          labelText: 'Departure date',
+                          border: OutlineInputBorder()),
+                      child: Text(_departureDate == null
+                          ? 'Select date'
+                          : '${_departureDate!.toLocal()}'.split(' ').first),
                     ),
                   ),
                   const SizedBox(height: 10),
                   Row(
                     children: [
-                      const Text('Passengers', style: TextStyle(fontSize: 13, color: slate)),
+                      const Text('Passengers',
+                          style: TextStyle(fontSize: 13, color: slate)),
                       const Spacer(),
-                      IconButton(onPressed: () => setState(() => _passengerCount = (_passengerCount - 1).clamp(1, 10)), icon: const Icon(Icons.remove_circle_outline)),
+                      IconButton(
+                          onPressed: () => setState(() => _passengerCount =
+                              (_passengerCount - 1).clamp(1, 10)),
+                          icon: const Icon(Icons.remove_circle_outline)),
                       Text('$_passengerCount'),
-                      IconButton(onPressed: () => setState(() => _passengerCount = (_passengerCount + 1).clamp(1, 10)), icon: const Icon(Icons.add_circle_outline)),
+                      IconButton(
+                          onPressed: () => setState(() => _passengerCount =
+                              (_passengerCount + 1).clamp(1, 10)),
+                          icon: const Icon(Icons.add_circle_outline)),
                     ],
                   ),
                   const SizedBox(height: 12),
                   ElevatedButton(
                     onPressed: _busy ? null : _book,
-                    style: ElevatedButton.styleFrom(backgroundColor: gold, foregroundColor: ink, minimumSize: const Size.fromHeight(48)),
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: gold,
+                        foregroundColor: ink,
+                        minimumSize: const Size.fromHeight(48)),
                     child: Text(_busy ? 'Booking…' : 'Search & book'),
                   ),
                 ],
@@ -160,13 +202,16 @@ class _TravelScreenState extends State<TravelScreen> {
           ),
           const SizedBox(height: 16),
           Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('My bookings', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const Text('My bookings',
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   const SizedBox(height: 10),
                   for (final b in _bookings)
                     Padding(
@@ -179,14 +224,25 @@ class _TravelScreenState extends State<TravelScreen> {
                             children: [
                               Row(
                                 children: [
-                                  Icon(b['type'] == 'FLIGHT' ? Icons.flight_rounded : Icons.local_shipping_rounded, size: 14, color: travelTeal),
+                                  Icon(
+                                      b['type'] == 'FLIGHT'
+                                          ? Icons.flight_rounded
+                                          : Icons.local_shipping_rounded,
+                                      size: 14,
+                                      color: travelTeal),
                                   const SizedBox(width: 6),
-                                  Text('${b['origin']} → ${b['destination']}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                                  Text('${b['origin']} → ${b['destination']}',
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 14)),
                                 ],
                               ),
                               Chip(
-                                label: Text(b['status'] ?? '', style: const TextStyle(fontSize: 11, color: Colors.white)),
-                                backgroundColor: _statusColor[b['status']] ?? slate,
+                                label: Text(b['status'] ?? '',
+                                    style: const TextStyle(
+                                        fontSize: 11, color: Colors.white)),
+                                backgroundColor:
+                                    _statusColor[b['status']] ?? slate,
                                 padding: EdgeInsets.zero,
                                 visualDensity: VisualDensity.compact,
                               ),
@@ -198,16 +254,21 @@ class _TravelScreenState extends State<TravelScreen> {
                             '${b['priceCents'] != null ? ' · GHS ${((b['priceCents'] as int) / 100).toStringAsFixed(2)}' : ''}',
                             style: const TextStyle(fontSize: 12, color: slate),
                           ),
-                          if (b['status'] == 'PENDING' || b['status'] == 'CONFIRMED')
+                          if (b['status'] == 'PENDING' ||
+                              b['status'] == 'CONFIRMED')
                             Align(
                               alignment: Alignment.centerLeft,
-                              child: TextButton(onPressed: () => _cancel(b['id']), child: const Text('Cancel')),
+                              child: TextButton(
+                                  onPressed: () => _cancel(b['id']),
+                                  child: const Text('Cancel')),
                             ),
                           const Divider(),
                         ],
                       ),
                     ),
-                  if (_bookings.isEmpty) const Text('No bookings yet.', style: TextStyle(fontSize: 13, color: slate)),
+                  if (_bookings.isEmpty)
+                    const Text('No bookings yet.',
+                        style: TextStyle(fontSize: 13, color: slate)),
                 ],
               ),
             ),

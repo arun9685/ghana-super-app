@@ -5,7 +5,6 @@ import '../../models/models.dart';
 import '../../widgets/trip_map_painter.dart';
 import '../../config/theme.dart';
 
-
 const _statusLabel = {
   'REQUESTED': 'Requesting…',
   'SEARCHING': 'Finding a driver…',
@@ -53,7 +52,8 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
 
   void _onDriverLocation(dynamic data) {
     if (data['rideId'] == widget.rideId && mounted) {
-      setState(() => _driverPos = TripPoint((data['lat'] as num).toDouble(), (data['lng'] as num).toDouble()));
+      setState(() => _driverPos = TripPoint(
+          (data['lat'] as num).toDouble(), (data['lng'] as num).toDouble()));
     }
   }
 
@@ -79,9 +79,15 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
   Widget build(BuildContext context) {
     final ride = _ride;
     return Scaffold(
-      appBar: AppBar(title: const Text('Your trip'), backgroundColor: navy, foregroundColor: Colors.white),
+      appBar: AppBar(
+          title: const Text('Your trip'),
+          backgroundColor: navy,
+          foregroundColor: Colors.white),
       body: ride == null
-          ? Center(child: _error != null ? Text(_error!, style: const TextStyle(color: Colors.red)) : const CircularProgressIndicator())
+          ? Center(
+              child: _error != null
+                  ? Text(_error!, style: const TextStyle(color: Colors.red))
+                  : const CircularProgressIndicator())
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
@@ -95,22 +101,37 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                 ),
                 const SizedBox(height: 16),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(color: gold.withOpacity(0.15), borderRadius: BorderRadius.circular(999)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                      color: gold.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(999)),
                   child: Text(_statusLabel[ride.status] ?? ride.status,
-                      style: const TextStyle(fontWeight: FontWeight.bold, color: goldDark)),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, color: goldDark)),
                 ),
                 const SizedBox(height: 16),
                 Card(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(children: [const Icon(Icons.my_location, color: Colors.green, size: 18), const SizedBox(width: 8), Expanded(child: Text(ride.pickupAddress))]),
+                        Row(children: [
+                          const Icon(Icons.my_location,
+                              color: Colors.green, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(child: Text(ride.pickupAddress))
+                        ]),
                         const SizedBox(height: 8),
-                        Row(children: [const Icon(Icons.location_on, color: Colors.red, size: 18), const SizedBox(width: 8), Expanded(child: Text(ride.dropoffAddress))]),
+                        Row(children: [
+                          const Icon(Icons.location_on,
+                              color: Colors.red, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(child: Text(ride.dropoffAddress))
+                        ]),
                       ],
                     ),
                   ),
@@ -118,24 +139,37 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                 const SizedBox(height: 16),
                 if (ride.driver != null)
                   Card(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
                     child: ListTile(
-                      leading: const CircleAvatar(backgroundColor: navy, child: Icon(Icons.person, color: Colors.white)),
+                      leading: const CircleAvatar(
+                          backgroundColor: navy,
+                          child: Icon(Icons.person, color: Colors.white)),
                       // REST responses nest driver info under driverProfile.user/.vehicle
                       // (see backend rides.service.ts's include shape); the live
                       // "ride:status" socket event is flatter, so this favors
                       // the REST shape since _load() is what populates ride.driver.
-                      title: Text(ride.driver!['user']?['name'] ?? ride.driver!['name'] ?? 'Driver'),
+                      title: Text(ride.driver!['user']?['name'] ??
+                          ride.driver!['name'] ??
+                          'Driver'),
                       subtitle: Text(
                           '${ride.driver!['vehicle']?['color'] ?? ''} ${ride.driver!['vehicle']?['make'] ?? ''} ${ride.driver!['vehicle']?['model'] ?? ''} · ${ride.driver!['vehicle']?['plateNumber'] ?? ''}'),
                     ),
                   ),
                 const SizedBox(height: 16),
-                Text('Fare: ${ride.formattedFare}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                Text('Fare: ${ride.formattedFare}',
+                    style: const TextStyle(
+                        fontSize: 20, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 20),
-                if (['REQUESTED', 'SEARCHING', 'ASSIGNED'].contains(ride.status))
-                  OutlinedButton(onPressed: _cancel, child: const Text('Cancel trip')),
-                if (_error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_error!, style: const TextStyle(color: Colors.red))),
+                if (['REQUESTED', 'SEARCHING', 'ASSIGNED']
+                    .contains(ride.status))
+                  OutlinedButton(
+                      onPressed: _cancel, child: const Text('Cancel trip')),
+                if (_error != null)
+                  Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Text(_error!,
+                          style: const TextStyle(color: Colors.red))),
               ],
             ),
     );

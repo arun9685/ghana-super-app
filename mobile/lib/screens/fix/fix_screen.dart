@@ -4,7 +4,15 @@ import '../../services/api_client.dart';
 import '../../state/auth_state.dart';
 import '../../config/theme.dart';
 
-const _categories = ['PLUMBING', 'ELECTRICAL', 'CLEANING', 'CARPENTRY', 'PAINTING', 'APPLIANCE_REPAIR', 'OTHER'];
+const _categories = [
+  'PLUMBING',
+  'ELECTRICAL',
+  'CLEANING',
+  'CARPENTRY',
+  'PAINTING',
+  'APPLIANCE_REPAIR',
+  'OTHER'
+];
 
 const _statusLabel = {
   'REQUESTED': 'Requested',
@@ -39,7 +47,8 @@ class _FixScreenState extends State<FixScreen> {
   bool _applying = false;
   bool _submitting = false;
 
-  bool get _isArtisan => context.read<AuthState>().me?.roles.contains('ARTISAN') ?? false;
+  bool get _isArtisan =>
+      context.read<AuthState>().me?.roles.contains('ARTISAN') ?? false;
 
   @override
   void initState() {
@@ -49,7 +58,8 @@ class _FixScreenState extends State<FixScreen> {
 
   Future<void> _loadAll() async {
     try {
-      final artisans = await ApiClient.instance.get('/fix/artisans', query: {'category': _category});
+      final artisans = await ApiClient.instance
+          .get('/fix/artisans', query: {'category': _category});
       if (mounted) setState(() => _artisans = artisans as List);
     } catch (_) {}
     try {
@@ -58,7 +68,8 @@ class _FixScreenState extends State<FixScreen> {
     } catch (_) {}
     if (_isArtisan) {
       try {
-        final open = await ApiClient.instance.get('/fix/requests', query: {'open': 'true'});
+        final open = await ApiClient.instance
+            .get('/fix/requests', query: {'open': 'true'});
         if (mounted) setState(() => _openRequests = open as List);
       } catch (_) {}
     }
@@ -71,7 +82,8 @@ class _FixScreenState extends State<FixScreen> {
     final authState = context.read<AuthState>();
     setState(() => _applying = true);
     try {
-      await ApiClient.instance.post('/fix/artisans/apply', body: {'category': _category, 'bio': ''});
+      await ApiClient.instance.post('/fix/artisans/apply',
+          body: {'category': _category, 'bio': ''});
       await authState.bootstrap();
       await _loadAll();
     } on ApiException catch (e) {
@@ -97,7 +109,8 @@ class _FixScreenState extends State<FixScreen> {
       });
       _descController.clear();
       _addressController.clear();
-      setState(() => _success = 'Request sent — nearby artisans will be notified.');
+      setState(
+          () => _success = 'Request sent — nearby artisans will be notified.');
       await _loadAll();
     } on ApiException catch (e) {
       setState(() => _error = e.message);
@@ -112,17 +125,24 @@ class _FixScreenState extends State<FixScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Quoted price (GHS)'),
-        content: TextField(controller: controller, keyboardType: TextInputType.number, decoration: const InputDecoration(hintText: 'e.g. 150')),
+        content: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(hintText: 'e.g. 150')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(ctx, controller.text), child: const Text('Accept')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, controller.text),
+              child: const Text('Accept')),
         ],
       ),
     );
     if (quoted == null || quoted.isEmpty) return;
     final cents = ((double.tryParse(quoted) ?? 0) * 100).round();
     try {
-      await ApiClient.instance.post('/fix/requests/$id/accept', body: {'quotedPriceCents': cents});
+      await ApiClient.instance
+          .post('/fix/requests/$id/accept', body: {'quotedPriceCents': cents});
       await _loadAll();
     } on ApiException catch (e) {
       setState(() => _error = e.message);
@@ -142,53 +162,76 @@ class _FixScreenState extends State<FixScreen> {
           if (!isArtisan)
             TextButton(
               onPressed: _applying ? null : _becomeArtisan,
-              child: Text(_applying ? 'Applying…' : 'Become an artisan', style: const TextStyle(color: Colors.white)),
+              child: Text(_applying ? 'Applying…' : 'Become an artisan',
+                  style: const TextStyle(color: Colors.white)),
             ),
         ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          if (_error != null) Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(_error!, style: const TextStyle(color: red))),
-          if (_success != null) Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(_success!, style: const TextStyle(color: navy))),
+          if (_error != null)
+            Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(_error!, style: const TextStyle(color: red))),
+          if (_success != null)
+            Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(_success!, style: const TextStyle(color: navy))),
           Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Request a service', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const Text('Request a service',
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     value: _category,
-                    items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(_pretty(c)))).toList(),
+                    items: _categories
+                        .map((c) =>
+                            DropdownMenuItem(value: c, child: Text(_pretty(c))))
+                        .toList(),
                     onChanged: (v) {
                       if (v == null) return;
                       setState(() => _category = v);
                       _loadAll();
                     },
-                    decoration: const InputDecoration(labelText: 'Category', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(
+                        labelText: 'Category', border: OutlineInputBorder()),
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _descController,
                     maxLines: 3,
-                    decoration: const InputDecoration(labelText: 'What do you need done?', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(
+                        labelText: 'What do you need done?',
+                        border: OutlineInputBorder()),
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _addressController,
-                    decoration: const InputDecoration(labelText: 'Address', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(
+                        labelText: 'Address', border: OutlineInputBorder()),
                   ),
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: _submitting ? null : _submitRequest,
-                    style: ElevatedButton.styleFrom(backgroundColor: gold, foregroundColor: ink, padding: const EdgeInsets.symmetric(vertical: 14), minimumSize: const Size.fromHeight(48)),
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: gold,
+                        foregroundColor: ink,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        minimumSize: const Size.fromHeight(48)),
                     child: Text(_submitting ? 'Sending…' : 'Find an artisan'),
                   ),
                   const SizedBox(height: 18),
-                  Text('Artisans in ${_pretty(_category).toLowerCase()}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  Text('Artisans in ${_pretty(_category).toLowerCase()}',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 14)),
                   const SizedBox(height: 8),
                   for (final a in _artisans)
                     Padding(
@@ -196,12 +239,18 @@ class _FixScreenState extends State<FixScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(a['user']?['name'] ?? a['user']?['phone'] ?? '', style: const TextStyle(fontSize: 13)),
-                          Text('★ ${(a['ratingAvg'] as num).toStringAsFixed(1)} · ${a['completedJobCount']} jobs', style: const TextStyle(fontSize: 13, color: slate)),
+                          Text(a['user']?['name'] ?? a['user']?['phone'] ?? '',
+                              style: const TextStyle(fontSize: 13)),
+                          Text(
+                              '★ ${(a['ratingAvg'] as num).toStringAsFixed(1)} · ${a['completedJobCount']} jobs',
+                              style:
+                                  const TextStyle(fontSize: 13, color: slate)),
                         ],
                       ),
                     ),
-                  if (_artisans.isEmpty) const Text('No artisans registered in this category yet.', style: TextStyle(fontSize: 13, color: slate)),
+                  if (_artisans.isEmpty)
+                    const Text('No artisans registered in this category yet.',
+                        style: TextStyle(fontSize: 13, color: slate)),
                 ],
               ),
             ),
@@ -209,48 +258,64 @@ class _FixScreenState extends State<FixScreen> {
           if (isArtisan) ...[
             const SizedBox(height: 16),
             Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Jobs near you', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const Text('Jobs near you',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 10),
                     for (final r in _openRequests)
                       Card(
                         margin: const EdgeInsets.symmetric(vertical: 4),
                         color: bg,
                         elevation: 0,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: hair)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: const BorderSide(color: hair)),
                         child: Padding(
                           padding: const EdgeInsets.all(12),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(_pretty(r['category'] ?? ''), style: const TextStyle(fontWeight: FontWeight.w600)),
+                              Text(_pretty(r['category'] ?? ''),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w600)),
                               const SizedBox(height: 4),
-                              Text(r['description'] ?? '', style: const TextStyle(fontSize: 13, color: slate)),
+                              Text(r['description'] ?? '',
+                                  style: const TextStyle(
+                                      fontSize: 13, color: slate)),
                               const SizedBox(height: 4),
-                              Text(r['address'] ?? '', style: const TextStyle(fontSize: 12, color: slate)),
+                              Text(r['address'] ?? '',
+                                  style: const TextStyle(
+                                      fontSize: 12, color: slate)),
                               const SizedBox(height: 8),
                               ElevatedButton(
                                 onPressed: () => _acceptJob(r['id']),
-                                style: ElevatedButton.styleFrom(backgroundColor: navy, foregroundColor: Colors.white),
+                                style: ElevatedButton.styleFrom(
+                                    backgroundColor: navy,
+                                    foregroundColor: Colors.white),
                                 child: const Text('Accept & quote'),
                               ),
                             ],
                           ),
                         ),
                       ),
-                    if (_openRequests.isEmpty) const Text('No open requests right now.', style: TextStyle(fontSize: 13, color: slate)),
+                    if (_openRequests.isEmpty)
+                      const Text('No open requests right now.',
+                          style: TextStyle(fontSize: 13, color: slate)),
                   ],
                 ),
               ),
             ),
           ],
           const SizedBox(height: 20),
-          const Text('My requests', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          const Text('My requests',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
           const SizedBox(height: 10),
           for (final r in _myRequests)
             Card(
@@ -263,10 +328,17 @@ class _FixScreenState extends State<FixScreen> {
                       : r['description'] ?? '',
                 ),
                 isThreeLine: r['quotedPriceCents'] != null,
-                trailing: Chip(label: Text(_statusLabel[r['status']] ?? r['status'] ?? '', style: const TextStyle(fontSize: 11)), backgroundColor: navyLight),
+                trailing: Chip(
+                    label: Text(_statusLabel[r['status']] ?? r['status'] ?? '',
+                        style: const TextStyle(fontSize: 11)),
+                    backgroundColor: navyLight),
               ),
             ),
-          if (_myRequests.isEmpty) const Padding(padding: EdgeInsets.only(top: 8), child: Text('No requests yet.', style: TextStyle(color: slate))),
+          if (_myRequests.isEmpty)
+            const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child:
+                    Text('No requests yet.', style: TextStyle(color: slate))),
         ],
       ),
     );

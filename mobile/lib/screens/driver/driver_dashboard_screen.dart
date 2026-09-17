@@ -8,7 +8,6 @@ import '../../models/models.dart';
 import '../../widgets/trip_map_painter.dart';
 import '../../config/theme.dart';
 
-
 // Driver-side flow: go online/offline, receive a new-assignment push
 // over the socket, then arrived -> start -> complete on the assigned
 // ride — the same lifecycle as frontend/src/pages/DriverDashboard.tsx,
@@ -48,7 +47,8 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
   Future<void> _loadActiveRide() async {
     try {
       final data = await ApiClient.instance.get('/rides/active-for-driver');
-      if (mounted) setState(() => _activeRide = data != null ? Ride.fromJson(data) : null);
+      if (mounted)
+        setState(() => _activeRide = data != null ? Ride.fromJson(data) : null);
       if (_activeRide != null) SocketService.instance.joinRide(_activeRide!.id);
     } catch (_) {}
   }
@@ -67,7 +67,8 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
         // as a stand-in for real GPS — see mobile/README.md for wiring
         // up `geolocator` for real device location.
         _pingTimer = Timer.periodic(const Duration(seconds: 8), (_) {
-          ApiClient.instance.post('/locations/ping', body: {'lat': 5.6037, 'lng': -0.187});
+          ApiClient.instance
+              .post('/locations/ping', body: {'lat': 5.6037, 'lng': -0.187});
         });
       }
     } on ApiException catch (e) {
@@ -99,30 +100,55 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
         title: const Text('Drive'),
         backgroundColor: navy,
         foregroundColor: Colors.white,
-        actions: [IconButton(icon: const Icon(Icons.logout), onPressed: () => context.read<AuthState>().logout())],
+        actions: [
+          IconButton(
+              icon: const Icon(Icons.logout),
+              onPressed: () => context.read<AuthState>().logout())
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Text('Welcome, ${me?.name ?? 'driver'}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          Text('Welcome, ${me?.name ?? 'driver'}',
+              style:
+                  const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
           Card(
             color: _online ? navy : ink,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             child: ListTile(
-              title: Text(_online ? "You're online" : "You're offline", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              subtitle: Text(_online ? 'Looking for ride requests nearby' : 'Go online to start receiving rides',
+              title: Text(_online ? "You're online" : "You're offline",
+                  style: const TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.bold)),
+              subtitle: Text(
+                  _online
+                      ? 'Looking for ride requests nearby'
+                      : 'Go online to start receiving rides',
                   style: const TextStyle(color: Colors.white70)),
-              trailing: Switch(value: _online, onChanged: _busy || _activeRide != null ? null : (_) => _toggleOnline(), activeColor: gold),
+              trailing: Switch(
+                  value: _online,
+                  onChanged: _busy || _activeRide != null
+                      ? null
+                      : (_) => _toggleOnline(),
+                  activeColor: gold),
             ),
           ),
-          if (_error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_error!, style: const TextStyle(color: Colors.red))),
+          if (_error != null)
+            Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child:
+                    Text(_error!, style: const TextStyle(color: Colors.red))),
           const SizedBox(height: 16),
-          if (_activeRide != null) _ActiveRideCard(ride: _activeRide!, busy: _busy, onAdvance: _advance),
+          if (_activeRide != null)
+            _ActiveRideCard(
+                ride: _activeRide!, busy: _busy, onAdvance: _advance),
           if (_activeRide == null && _online)
             const Padding(
               padding: EdgeInsets.only(top: 40),
-              child: Center(child: Text('Waiting for a ride request…', style: TextStyle(color: Colors.grey))),
+              child: Center(
+                  child: Text('Waiting for a ride request…',
+                      style: TextStyle(color: Colors.grey))),
             ),
         ],
       ),
@@ -135,7 +161,8 @@ class _ActiveRideCard extends StatelessWidget {
   final bool busy;
   final Future<void> Function(String action) onAdvance;
 
-  const _ActiveRideCard({required this.ride, required this.busy, required this.onAdvance});
+  const _ActiveRideCard(
+      {required this.ride, required this.busy, required this.onAdvance});
 
   @override
   Widget build(BuildContext context) {
@@ -165,12 +192,16 @@ class _ActiveRideCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text('Drop-off: ${ride.dropoffAddress}'),
             const SizedBox(height: 8),
-            Text('Fare: ${ride.formattedFare}', style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text('Fare: ${ride.formattedFare}',
+                style: const TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
             if (nextAction.$1 != null)
               ElevatedButton(
                 onPressed: busy ? null : () => onAdvance(nextAction.$1!),
-                style: ElevatedButton.styleFrom(backgroundColor: gold, foregroundColor: navy, padding: const EdgeInsets.symmetric(vertical: 14)),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: gold,
+                    foregroundColor: navy,
+                    padding: const EdgeInsets.symmetric(vertical: 14)),
                 child: Text(nextAction.$2!),
               ),
           ],

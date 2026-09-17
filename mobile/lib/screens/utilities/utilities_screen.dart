@@ -88,7 +88,10 @@ class _UtilitiesScreenState extends State<UtilitiesScreen> {
     final isPhoneType = _type == 'AIRTIME' || _type == 'DATA';
     return Scaffold(
       backgroundColor: bg,
-      appBar: AppBar(title: const Text('Utilities'), backgroundColor: blue, foregroundColor: Colors.white),
+      appBar: AppBar(
+          title: const Text('Utilities'),
+          backgroundColor: blue,
+          foregroundColor: Colors.white),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -107,7 +110,8 @@ class _UtilitiesScreenState extends State<UtilitiesScreen> {
           ),
           const SizedBox(height: 16),
           Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -115,27 +119,49 @@ class _UtilitiesScreenState extends State<UtilitiesScreen> {
                 children: [
                   DropdownButtonFormField<String>(
                     value: _provider,
-                    items: _providersByType[_type]!.map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
-                    onChanged: (v) => setState(() => _provider = v ?? _provider),
-                    decoration: const InputDecoration(labelText: 'Provider', border: OutlineInputBorder()),
+                    items: _providersByType[_type]!
+                        .map((p) => DropdownMenuItem(value: p, child: Text(p)))
+                        .toList(),
+                    onChanged: (v) =>
+                        setState(() => _provider = v ?? _provider),
+                    decoration: const InputDecoration(
+                        labelText: 'Provider', border: OutlineInputBorder()),
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _accountController,
-                    decoration: InputDecoration(labelText: isPhoneType ? 'Phone number' : 'Account / meter number', border: const OutlineInputBorder()),
+                    decoration: InputDecoration(
+                        labelText: isPhoneType
+                            ? 'Phone number'
+                            : 'Account / meter number',
+                        border: const OutlineInputBorder()),
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _amountController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: 'Amount (GHS)', border: OutlineInputBorder()),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                        labelText: 'Amount (GHS)',
+                        border: OutlineInputBorder()),
                   ),
-                  if (_error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_error!, style: const TextStyle(color: red, fontSize: 13))),
-                  if (_success != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_success!, style: const TextStyle(color: navy, fontSize: 13))),
+                  if (_error != null)
+                    Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: Text(_error!,
+                            style: const TextStyle(color: red, fontSize: 13))),
+                  if (_success != null)
+                    Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: Text(_success!,
+                            style: const TextStyle(color: navy, fontSize: 13))),
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: _submitting ? null : _submit,
-                    style: ElevatedButton.styleFrom(backgroundColor: gold, foregroundColor: ink, minimumSize: const Size.fromHeight(48)),
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: gold,
+                        foregroundColor: ink,
+                        minimumSize: const Size.fromHeight(48)),
                     child: Text(_submitting ? 'Processing…' : 'Pay now'),
                   ),
                 ],
@@ -143,25 +169,40 @@ class _UtilitiesScreenState extends State<UtilitiesScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          const Text('Recent payments', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          const Text('Recent payments',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(height: 10),
           for (final p in _payments)
             Card(
               margin: const EdgeInsets.symmetric(vertical: 4),
               child: ListTile(
-                title: Text('${(p['type'] as String).replaceAll('_', ' ')} · ${p['provider']}'),
+                title: Text(
+                    '${(p['type'] as String).replaceAll('_', ' ')} · ${p['provider']}'),
                 subtitle: Text(p['accountRef'] ?? ''),
                 trailing: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text('GHS ${((p['amountCents'] as int) / 100).toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    Text(p['status'] ?? '', style: TextStyle(fontSize: 11, color: p['status'] == 'SUCCESS' ? navy : p['status'] == 'FAILED' ? red : slate)),
+                    Text(
+                        'GHS ${((p['amountCents'] as int) / 100).toStringAsFixed(2)}',
+                        style: const TextStyle(fontWeight: FontWeight.bold)),
+                    Text(p['status'] ?? '',
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: p['status'] == 'SUCCESS'
+                                ? navy
+                                : p['status'] == 'FAILED'
+                                    ? red
+                                    : slate)),
                   ],
                 ),
               ),
             ),
-          if (_payments.isEmpty) const Padding(padding: EdgeInsets.only(top: 8), child: Text('No payments yet.', style: TextStyle(color: slate))),
+          if (_payments.isEmpty)
+            const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child:
+                    Text('No payments yet.', style: TextStyle(color: slate))),
         ],
       ),
     );

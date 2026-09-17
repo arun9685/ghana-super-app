@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../../services/api_client.dart';
 import '../../config/theme.dart';
 
-
 class DriverApplyScreen extends StatefulWidget {
   final VoidCallback? onBack;
   const DriverApplyScreen({super.key, this.onBack});
@@ -49,7 +48,7 @@ class _DriverApplyScreenState extends State<DriverApplyScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-            appBar: AppBar(
+      appBar: AppBar(
         title: const Text('Become a driver'),
         backgroundColor: navy,
         foregroundColor: Colors.white,
@@ -73,8 +72,10 @@ class _DriverApplyScreenState extends State<DriverApplyScreen> {
                     ),
                     const SizedBox(height: 20),
                     ElevatedButton(
-                      onPressed: widget.onBack ?? () => Navigator.of(context).maybePop(),
-                      style: ElevatedButton.styleFrom(backgroundColor: gold, foregroundColor: navy),
+                      onPressed: widget.onBack ??
+                          () => Navigator.of(context).maybePop(),
+                      style: ElevatedButton.styleFrom(
+                          backgroundColor: gold, foregroundColor: navy),
                       child: const Text('Back to home'),
                     ),
                   ],
@@ -84,28 +85,58 @@ class _DriverApplyScreenState extends State<DriverApplyScreen> {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                TextField(controller: _license, decoration: const InputDecoration(labelText: 'License number', border: OutlineInputBorder())),
+                TextField(
+                    controller: _license,
+                    decoration: const InputDecoration(
+                        labelText: 'License number',
+                        border: OutlineInputBorder())),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   value: _type,
-                  decoration: const InputDecoration(labelText: 'Vehicle type', border: OutlineInputBorder()),
-                  items: const ['MOTORBIKE', 'TUKTUK', 'SEDAN', 'SUV'].map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+                  decoration: const InputDecoration(
+                      labelText: 'Vehicle type', border: OutlineInputBorder()),
+                  items: const ['MOTORBIKE', 'TUKTUK', 'SEDAN', 'SUV']
+                      .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                      .toList(),
                   onChanged: (v) => setState(() => _type = v ?? 'SEDAN'),
                 ),
                 const SizedBox(height: 12),
-                TextField(controller: _make, decoration: const InputDecoration(labelText: 'Make (e.g. Toyota)', border: OutlineInputBorder())),
+                TextField(
+                    controller: _make,
+                    decoration: const InputDecoration(
+                        labelText: 'Make (e.g. Toyota)',
+                        border: OutlineInputBorder())),
                 const SizedBox(height: 12),
-                TextField(controller: _model, decoration: const InputDecoration(labelText: 'Model (e.g. Corolla)', border: OutlineInputBorder())),
+                TextField(
+                    controller: _model,
+                    decoration: const InputDecoration(
+                        labelText: 'Model (e.g. Corolla)',
+                        border: OutlineInputBorder())),
                 const SizedBox(height: 12),
-                TextField(controller: _color, decoration: const InputDecoration(labelText: 'Color', border: OutlineInputBorder())),
+                TextField(
+                    controller: _color,
+                    decoration: const InputDecoration(
+                        labelText: 'Color', border: OutlineInputBorder())),
                 const SizedBox(height: 12),
-                TextField(controller: _plate, decoration: const InputDecoration(labelText: 'Plate number', border: OutlineInputBorder())),
-                if (_error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_error!, style: const TextStyle(color: Colors.red))),
+                TextField(
+                    controller: _plate,
+                    decoration: const InputDecoration(
+                        labelText: 'Plate number',
+                        border: OutlineInputBorder())),
+                if (_error != null)
+                  Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Text(_error!,
+                          style: const TextStyle(color: Colors.red))),
                 const SizedBox(height: 20),
                 ElevatedButton(
                   onPressed: _submitting ? null : _submit,
-                  style: ElevatedButton.styleFrom(backgroundColor: gold, foregroundColor: navy, padding: const EdgeInsets.symmetric(vertical: 16)),
-                  child: Text(_submitting ? 'Submitting…' : 'Submit application'),
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: gold,
+                      foregroundColor: navy,
+                      padding: const EdgeInsets.symmetric(vertical: 16)),
+                  child:
+                      Text(_submitting ? 'Submitting…' : 'Submit application'),
                 ),
               ],
             ),

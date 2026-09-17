@@ -55,7 +55,10 @@ class _LiquidityScreenState extends State<LiquidityScreen> {
     });
     try {
       final amount = double.tryParse(_topUpController.text) ?? 0;
-      await ApiClient.instance.post('/liquidity/wallet/topup', body: {'amountCents': (amount * 100).round(), 'method': 'MOBILE_MONEY'});
+      await ApiClient.instance.post('/liquidity/wallet/topup', body: {
+        'amountCents': (amount * 100).round(),
+        'method': 'MOBILE_MONEY'
+      });
       _topUpController.clear();
       await _load();
     } on ApiException catch (e) {
@@ -74,7 +77,8 @@ class _LiquidityScreenState extends State<LiquidityScreen> {
       final amount = double.tryParse(_loanAmountController.text) ?? 0;
       await ApiClient.instance.post('/liquidity/loans', body: {
         'amountCents': (amount * 100).round(),
-        if (_loanPurposeController.text.isNotEmpty) 'purpose': _loanPurposeController.text,
+        if (_loanPurposeController.text.isNotEmpty)
+          'purpose': _loanPurposeController.text,
       });
       _loanAmountController.clear();
       _loanPurposeController.clear();
@@ -92,46 +96,69 @@ class _LiquidityScreenState extends State<LiquidityScreen> {
     final transactions = (_wallet?['transactions'] as List?) ?? [];
     return Scaffold(
       backgroundColor: bg,
-      appBar: AppBar(title: const Text('Liquidity'), backgroundColor: goldDark, foregroundColor: Colors.white),
+      appBar: AppBar(
+          title: const Text('Liquidity'),
+          backgroundColor: goldDark,
+          foregroundColor: Colors.white),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           Container(
             padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(color: ink, borderRadius: BorderRadius.circular(18)),
+            decoration: BoxDecoration(
+                color: ink, borderRadius: BorderRadius.circular(18)),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Wallet balance', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                const Text('Wallet balance',
+                    style: TextStyle(color: Colors.white70, fontSize: 13)),
                 const SizedBox(height: 6),
-                Text('GHS ${(balanceCents / 100).toStringAsFixed(2)}', style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.bold)),
+                Text('GHS ${(balanceCents / 100).toStringAsFixed(2)}',
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 30,
+                        fontWeight: FontWeight.bold)),
               ],
             ),
           ),
           const SizedBox(height: 16),
-          if (_error != null) Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(_error!, style: const TextStyle(color: red))),
+          if (_error != null)
+            Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(_error!, style: const TextStyle(color: red))),
           Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Top up wallet', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const Text('Top up wallet',
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _topUpController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: 'Amount (GHS)', border: OutlineInputBorder()),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                        labelText: 'Amount (GHS)',
+                        border: OutlineInputBorder()),
                   ),
                   const SizedBox(height: 12),
                   ElevatedButton(
                     onPressed: _busy ? null : _topUp,
-                    style: ElevatedButton.styleFrom(backgroundColor: gold, foregroundColor: ink, minimumSize: const Size.fromHeight(48)),
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: gold,
+                        foregroundColor: ink,
+                        minimumSize: const Size.fromHeight(48)),
                     child: const Text('Top up'),
                   ),
                   const SizedBox(height: 18),
-                  const Text('Recent activity', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  const Text('Recent activity',
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                   const SizedBox(height: 8),
                   for (final t in transactions)
                     Padding(
@@ -139,47 +166,69 @@ class _LiquidityScreenState extends State<LiquidityScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Expanded(child: Text(t['note'] ?? t['type'] ?? '', style: const TextStyle(fontSize: 13))),
+                          Expanded(
+                              child: Text(t['note'] ?? t['type'] ?? '',
+                                  style: const TextStyle(fontSize: 13))),
                           Text(
-                            '${['WITHDRAWAL', 'TRANSFER_OUT', 'PAYMENT'].contains(t['type']) ? '-' : '+'}GHS ${((t['amountCents'] as int) / 100).toStringAsFixed(2)}',
-                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                            '${[
+                              'WITHDRAWAL',
+                              'TRANSFER_OUT',
+                              'PAYMENT'
+                            ].contains(t['type']) ? '-' : '+'}GHS ${((t['amountCents'] as int) / 100).toStringAsFixed(2)}',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w600, fontSize: 13),
                           ),
                         ],
                       ),
                     ),
-                  if (transactions.isEmpty) const Text('No activity yet.', style: TextStyle(fontSize: 13, color: slate)),
+                  if (transactions.isEmpty)
+                    const Text('No activity yet.',
+                        style: TextStyle(fontSize: 13, color: slate)),
                 ],
               ),
             ),
           ),
           const SizedBox(height: 16),
           Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Apply for a microloan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const Text('Apply for a microloan',
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _loanAmountController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: 'Amount (GHS)', border: OutlineInputBorder()),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                        labelText: 'Amount (GHS)',
+                        border: OutlineInputBorder()),
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _loanPurposeController,
-                    decoration: const InputDecoration(labelText: 'Purpose (optional)', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(
+                        labelText: 'Purpose (optional)',
+                        border: OutlineInputBorder()),
                   ),
                   const SizedBox(height: 12),
                   ElevatedButton(
                     onPressed: _busy ? null : _applyLoan,
-                    style: ElevatedButton.styleFrom(backgroundColor: navy, foregroundColor: Colors.white, minimumSize: const Size.fromHeight(48)),
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: navy,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size.fromHeight(48)),
                     child: const Text('Submit application'),
                   ),
                   const SizedBox(height: 18),
-                  const Text('My applications', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  const Text('My applications',
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                   const SizedBox(height: 8),
                   for (final l in _loans)
                     Padding(
@@ -194,15 +243,20 @@ class _LiquidityScreenState extends State<LiquidityScreen> {
                             ),
                           ),
                           Chip(
-                            label: Text(l['status'] ?? '', style: const TextStyle(fontSize: 11, color: Colors.white)),
-                            backgroundColor: _loanStatusColor[l['status']] ?? slate,
+                            label: Text(l['status'] ?? '',
+                                style: const TextStyle(
+                                    fontSize: 11, color: Colors.white)),
+                            backgroundColor:
+                                _loanStatusColor[l['status']] ?? slate,
                             padding: EdgeInsets.zero,
                             visualDensity: VisualDensity.compact,
                           ),
                         ],
                       ),
                     ),
-                  if (_loans.isEmpty) const Text('No loan applications yet.', style: TextStyle(fontSize: 13, color: slate)),
+                  if (_loans.isEmpty)
+                    const Text('No loan applications yet.',
+                        style: TextStyle(fontSize: 13, color: slate)),
                 ],
               ),
             ),

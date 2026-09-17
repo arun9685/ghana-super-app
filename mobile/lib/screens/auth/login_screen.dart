@@ -39,7 +39,9 @@ class _LoginScreenState extends State<LoginScreen> {
       _loading = true;
     });
     try {
-      await context.read<AuthState>().verifyOtp(_phoneController.text, _otpController.text);
+      await context
+          .read<AuthState>()
+          .verifyOtp(_phoneController.text, _otpController.text);
     } on ApiException catch (e) {
       setState(() => _error = e.message);
     } finally {
@@ -57,7 +59,10 @@ class _LoginScreenState extends State<LoginScreen> {
         children: [
           Container(
             decoration: const BoxDecoration(
-              gradient: LinearGradient(colors: [navy, navyDark], begin: Alignment.topLeft, end: Alignment.bottomRight),
+              gradient: LinearGradient(
+                  colors: [navy, navyDark],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight),
             ),
           ),
           Positioned.fill(child: CustomPaint(painter: _StripePainter())),
@@ -70,15 +75,24 @@ class _LoginScreenState extends State<LoginScreen> {
                   children: [
                     const SankofaMark(size: 56, light: true),
                     const SizedBox(height: 16),
-                    const Text('Sankofa', style: TextStyle(fontSize: 28, color: Colors.white, fontWeight: FontWeight.w800, letterSpacing: -0.7)),
+                    const Text('Sankofa',
+                        style: TextStyle(
+                            fontSize: 28,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.7)),
                     const SizedBox(height: 6),
-                    const Text('Rides, food, bills and more — one account.', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                    const Text('Rides, food, bills and more — one account.',
+                        style: TextStyle(color: Colors.white70, fontSize: 14)),
                     const SizedBox(height: 28),
                     Card(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20)),
                       child: Padding(
                         padding: const EdgeInsets.all(20),
-                        child: _step == 'phone' ? _phoneForm(gold, navyDark) : _otpForm(gold, navyDark),
+                        child: _step == 'phone'
+                            ? _phoneForm(gold, navyDark)
+                            : _otpForm(gold, navyDark),
                       ),
                     ),
                   ],
@@ -96,18 +110,26 @@ class _LoginScreenState extends State<LoginScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Text('Phone number', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+        const Text('Phone number',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
         const SizedBox(height: 8),
         TextField(
           controller: _phoneController,
           keyboardType: TextInputType.phone,
-          decoration: const InputDecoration(hintText: '0244 123 456', border: OutlineInputBorder()),
+          decoration: const InputDecoration(
+              hintText: '0244 123 456', border: OutlineInputBorder()),
         ),
-        if (_error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_error!, style: const TextStyle(color: Colors.red))),
+        if (_error != null)
+          Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Text(_error!, style: const TextStyle(color: Colors.red))),
         const SizedBox(height: 16),
         ElevatedButton(
           onPressed: _loading ? null : _requestOtp,
-          style: ElevatedButton.styleFrom(backgroundColor: gold, foregroundColor: navyDark, padding: const EdgeInsets.symmetric(vertical: 16)),
+          style: ElevatedButton.styleFrom(
+              backgroundColor: gold,
+              foregroundColor: navyDark,
+              padding: const EdgeInsets.symmetric(vertical: 16)),
           child: Text(_loading ? 'Sending code…' : 'Send verification code'),
         ),
         const SizedBox(height: 12),
@@ -125,7 +147,8 @@ class _LoginScreenState extends State<LoginScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text('Enter the 6-digit code sent to ${_phoneController.text}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+        Text('Enter the 6-digit code sent to ${_phoneController.text}',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
         const SizedBox(height: 8),
         TextField(
           controller: _otpController,
@@ -133,17 +156,26 @@ class _LoginScreenState extends State<LoginScreen> {
           maxLength: 6,
           textAlign: TextAlign.center,
           style: const TextStyle(fontSize: 22, letterSpacing: 8),
-          decoration: const InputDecoration(counterText: '', border: OutlineInputBorder()),
+          decoration: const InputDecoration(
+              counterText: '', border: OutlineInputBorder()),
         ),
-        if (_error != null) Padding(padding: const EdgeInsets.only(top: 4), child: Text(_error!, style: const TextStyle(color: Colors.red))),
+        if (_error != null)
+          Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(_error!, style: const TextStyle(color: Colors.red))),
         const SizedBox(height: 8),
         ElevatedButton(
           onPressed: _loading ? null : _verify,
-          style: ElevatedButton.styleFrom(backgroundColor: gold, foregroundColor: navyDark, padding: const EdgeInsets.symmetric(vertical: 16)),
+          style: ElevatedButton.styleFrom(
+              backgroundColor: gold,
+              foregroundColor: navyDark,
+              padding: const EdgeInsets.symmetric(vertical: 16)),
           child: Text(_loading ? 'Verifying…' : 'Verify & continue'),
         ),
         const SizedBox(height: 8),
-        OutlinedButton(onPressed: () => setState(() => _step = 'phone'), child: const Text('Use a different number')),
+        OutlinedButton(
+            onPressed: () => setState(() => _step = 'phone'),
+            child: const Text('Use a different number')),
       ],
     );
   }
@@ -161,7 +193,8 @@ class _StripePainter extends CustomPainter {
     const spacing = 26.0;
     final diag = size.width + size.height;
     for (double i = -diag; i < diag; i += spacing) {
-      canvas.drawLine(Offset(i, 0), Offset(i + size.height, size.height), paint);
+      canvas.drawLine(
+          Offset(i, 0), Offset(i + size.height, size.height), paint);
     }
   }
 

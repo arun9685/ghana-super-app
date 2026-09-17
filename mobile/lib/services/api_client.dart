@@ -118,7 +118,10 @@ class ApiClient {
     return decoded?['data'];
   }
 
-  Future<dynamic> get(String path, {Map<String, String>? query}) => request('GET', path, query: query);
-  Future<dynamic> post(String path, {Map<String, dynamic>? body}) => request('POST', path, body: body);
-  Future<dynamic> patch(String path, {Map<String, dynamic>? body}) => request('PATCH', path, body: body);
+  Future<dynamic> get(String path, {Map<String, String>? query}) =>
+      request('GET', path, query: query);
+  Future<dynamic> post(String path, {Map<String, dynamic>? body}) =>
+      request('POST', path, body: body);
+  Future<dynamic> patch(String path, {Map<String, dynamic>? body}) =>
+      request('PATCH', path, body: body);
 }
