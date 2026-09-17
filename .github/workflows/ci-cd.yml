@@ -345,7 +345,7 @@ jobs:
           exit 1
 
       - name: Fail build on CRITICAL/HIGH vulnerabilities
-              if: ${{ vars.ECR_REPOSITORY_URL != '' && steps.wait-scan.outcome == 'success' }}
+        if: ${{ vars.ECR_REPOSITORY_URL != '' && steps.wait-scan.outcome == 'success' }}
         run: |
           COUNTS=$(aws ecr describe-image-scan-findings \
             --repository-name ghana-super-app-backend \
