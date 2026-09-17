@@ -125,23 +125,39 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 const httpServer = createServer(app);
+// Always attach socket.io to the http server object (this just wires up
+// request/upgrade listeners — it does not bind a port on its own), so
+// anything that imports `io` from realtime/socket (e.g.
+// notifications.service.ts) still works under tests, even though the
+// server below never actually starts listening in that case.
 initSocket(httpServer);
 
-const server = httpServer.listen(env.PORT, () => {
-  logger.info(`Ghana Super App backend listening on port ${env.PORT} (${env.NODE_ENV})`);
-});
+// Test-run fix: this used to call httpServer.listen() unconditionally at
+// import time. That's fine when main.ts is the real process entry point,
+// but payments.webhook.test.ts (and any future test) imports `app` from
+// here for supertest, and that import alone was enough to bind the real
+// port — colliding with an already-running dev server locally, and with
+// itself across parallel test files in CI (EADDRINUSE). Only actually
+// listen when this file is genuinely being run as the server.
+let server: ReturnType<typeof createServer> | undefined;
 
-// Don't drop in-flight requests on deploy — finish them, then exit.
-// Matters more once this runs behind an ALB doing rolling deploys (spec §47).
-function shutdown(signal: string) {
-  logger.info(`${signal} received — shutting down gracefully`);
-  server.close(async () => {
-    await prisma.$disconnect();
-    redis.disconnect();
-    process.exit(0);
+if (env.NODE_ENV !== "test") {
+  server = httpServer.listen(env.PORT, () => {
+    logger.info(`Ghana Super App backend listening on port ${env.PORT} (${env.NODE_ENV})`);
   });
+
+  // Don't drop in-flight requests on deploy — finish them, then exit.
+  // Matters more once this runs behind an ALB doing rolling deploys (spec §47).
+  function shutdown(signal: string) {
+    logger.info(`${signal} received — shutting down gracefully`);
+    server!.close(async () => {
+      await prisma.$disconnect();
+      redis.disconnect();
+      process.exit(0);
+    });
+  }
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 }
-process.on("SIGTERM", () => shutdown("SIGTERM"));
-process.on("SIGINT", () => shutdown("SIGINT"));
 
 export { app };
