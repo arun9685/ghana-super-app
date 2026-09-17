@@ -19,7 +19,6 @@ import { env } from "@/config/env";
 //                               whoever the ride belongs to (customer or
 //                               assigned driver), left on completion.
 
-// eslint-disable-next-line import/no-mutable-exports
 export let io: Server;
 
 interface AuthedSocket extends Socket {
