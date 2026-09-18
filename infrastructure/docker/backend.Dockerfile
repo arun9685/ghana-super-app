@@ -15,7 +15,7 @@
 # infrastructure/docker/pin-base-images.sh on a machine with Docker +
 # network access and replace both FROM lines below with
 # `node:20-alpine@sha256:<digest>`; Dependabot then keeps it current.
-FROM node:20-alpine AS builder
+FROM node:26-alpine AS builder
 RUN apk add --no-cache openssl
 WORKDIR /app
 COPY package*.json ./
@@ -27,7 +27,7 @@ RUN npm run build
 RUN echo "--- dist contents ---" && ls -la dist && \
     test -f dist/main.js || (echo "BUILD FAILED: dist/main.js was not produced by 'npm run build'" && exit 1)
 
-FROM node:20-alpine AS runner
+FROM node:26-alpine AS runner
 RUN apk add --no-cache openssl
 WORKDIR /app
 ENV NODE_ENV=production
