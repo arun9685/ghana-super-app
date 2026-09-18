@@ -9,7 +9,7 @@
 # infrastructure/docker/ folder for the nginx config.
 # TODO(digest-pin): see infrastructure/docker/pin-base-images.sh — same
 # reasoning as backend.Dockerfile.
-FROM node:20-alpine AS builder
+FROM node:26-alpine AS builder
 WORKDIR /app
 
 ARG VITE_API_URL
