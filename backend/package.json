@@ -21,7 +21,7 @@
     "rotate:pii-keys": "dotenv -e .env -- tsx scripts/rotate-pii-keys.ts"
   },
   "dependencies": {
-    "@prisma/client": "^5.19.1",
+    "@prisma/client": "^7.10.0",
     "prisma": "^5.19.1",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
